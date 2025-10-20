@@ -120,7 +120,11 @@ pub fn format_header_line(layout: &LayoutConfig) {
     println!("{}", line.render());
 }
 
-pub fn format_worktree_line(info: &WorktreeInfo, layout: &LayoutConfig) {
+pub fn format_worktree_line(
+    info: &WorktreeInfo,
+    layout: &LayoutConfig,
+    current_worktree_path: Option<&std::path::PathBuf>,
+) {
     let widths = &layout.widths;
     let theme = Theme::new();
     let primary_style = theme.primary;
@@ -134,7 +138,10 @@ pub fn format_worktree_line(info: &WorktreeInfo, layout: &LayoutConfig) {
     let short_head = &info.head[..8.min(info.head.len())];
 
     // Determine styles: current worktree is bold magenta, primary is cyan
-    let text_style = match (info.is_current, info.is_primary) {
+    let is_current = current_worktree_path
+        .map(|p| p == &info.path)
+        .unwrap_or(false);
+    let text_style = match (is_current, info.is_primary) {
         (true, _) => Some(current_style),
         (_, true) => Some(primary_style),
         _ => None,
@@ -314,7 +321,6 @@ mod tests {
             working_tree_diff: (100, 50),
             branch_diff: (200, 30),
             is_primary: false,
-            is_current: false,
             detached: false,
             bare: false,
             locked: Some("test lck".to_string()), // "(locked: test lck)" = 18 chars

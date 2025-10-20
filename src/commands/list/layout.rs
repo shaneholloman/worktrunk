@@ -289,7 +289,6 @@ mod tests {
             working_tree_diff: (100, 50),
             branch_diff: (200, 30),
             is_primary: false,
-            is_current: false,
             detached: false,
             bare: false,
             locked: None,

@@ -18,7 +18,6 @@ pub struct WorktreeInfo {
     pub working_tree_diff: (usize, usize),
     pub branch_diff: (usize, usize),
     pub is_primary: bool,
-    pub is_current: bool,
     pub detached: bool,
     pub bare: bool,
     pub locked: Option<String>,
@@ -29,29 +28,11 @@ pub struct WorktreeInfo {
     pub worktree_state: Option<String>,
 }
 
-pub fn handle_list() -> Result<(), GitError> {
-    let repo = Repository::current();
-    let worktrees = repo.list_worktrees()?;
-
-    if worktrees.is_empty() {
-        return Ok(());
-    }
-
-    // First worktree is the primary
-    let primary = &worktrees[0];
-    let primary_branch = primary.branch.as_ref();
-
-    // Get current worktree to identify active one
-    let current_worktree_path = repo.worktree_root().ok();
-
-    // Helper function to process a single worktree
-    let process_worktree = |idx: usize, wt: &worktrunk::git::Worktree| -> WorktreeInfo {
+impl WorktreeInfo {
+    /// Create WorktreeInfo from a Worktree, enriching it with git metadata
+    fn from_worktree(wt: &worktrunk::git::Worktree, primary: &worktrunk::git::Worktree) -> Self {
         let wt_repo = Repository::at(&wt.path);
-        let is_primary = idx == 0;
-        let is_current = current_worktree_path
-            .as_ref()
-            .map(|p| p == &wt.path)
-            .unwrap_or(false);
+        let is_primary = wt.path == primary.path;
 
         // Get commit timestamp
         let timestamp = wt_repo.commit_timestamp(&wt.head).unwrap_or(0);
@@ -62,7 +43,7 @@ pub fn handle_list() -> Result<(), GitError> {
         // Calculate ahead/behind relative to primary branch (only if primary has a branch)
         let (ahead, behind) = if is_primary {
             (0, 0)
-        } else if let Some(pb) = primary_branch {
+        } else if let Some(pb) = primary.branch.as_deref() {
             wt_repo.ahead_behind(pb, &wt.head).unwrap_or((0, 0))
         } else {
             (0, 0)
@@ -72,7 +53,7 @@ pub fn handle_list() -> Result<(), GitError> {
         // Get branch diff stats (downstream of primary, only if primary has a branch)
         let branch_diff = if is_primary {
             (0, 0)
-        } else if let Some(pb) = primary_branch {
+        } else if let Some(pb) = primary.branch.as_deref() {
             wt_repo.branch_diff_stats(pb, &wt.head).unwrap_or((0, 0))
         } else {
             (0, 0)
@@ -113,7 +94,6 @@ pub fn handle_list() -> Result<(), GitError> {
             working_tree_diff,
             branch_diff,
             is_primary,
-            is_current,
             detached: wt.detached,
             bare: wt.bare,
             locked: wt.locked.clone(),
@@ -123,7 +103,22 @@ pub fn handle_list() -> Result<(), GitError> {
             upstream_behind,
             worktree_state,
         }
-    };
+    }
+}
+
+pub fn handle_list() -> Result<(), GitError> {
+    let repo = Repository::current();
+    let worktrees = repo.list_worktrees()?;
+
+    if worktrees.is_empty() {
+        return Ok(());
+    }
+
+    // First worktree is the primary
+    let primary = &worktrees[0];
+
+    // Get current worktree to identify active one
+    let current_worktree_path = repo.worktree_root().ok();
 
     // Gather enhanced information for all worktrees in parallel
     //
@@ -141,15 +136,13 @@ pub fn handle_list() -> Result<(), GitError> {
         // Sequential iteration (for benchmarking)
         worktrees
             .iter()
-            .enumerate()
-            .map(|(idx, wt)| process_worktree(idx, wt))
+            .map(|wt| WorktreeInfo::from_worktree(wt, primary))
             .collect()
     } else {
         // Parallel iteration (default)
         worktrees
             .par_iter()
-            .enumerate()
-            .map(|(idx, wt)| process_worktree(idx, wt))
+            .map(|wt| WorktreeInfo::from_worktree(wt, primary))
             .collect()
     };
 
@@ -164,7 +157,7 @@ pub fn handle_list() -> Result<(), GitError> {
 
     // Display formatted output
     for info in &infos {
-        format_worktree_line(info, &layout);
+        format_worktree_line(info, &layout, current_worktree_path.as_ref());
     }
 
     Ok(())
