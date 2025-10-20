@@ -1,5 +1,6 @@
 use crate::common::TestRepo;
 use insta_cmd::get_cargo_bin;
+use rstest::rstest;
 use std::process::Command;
 
 /// Helper to check if a shell is available on the system
@@ -65,34 +66,46 @@ fn generate_init_code(repo: &TestRepo, shell: &str) -> String {
     String::from_utf8(output.stdout).expect("Invalid UTF-8 in init code")
 }
 
-#[test]
-fn test_bash_e2e_switch_changes_directory() {
-    if !is_shell_available("bash") {
-        eprintln!("Skipping test: bash not available");
+/// Generate shell-specific PATH export syntax
+fn path_export_syntax(shell: &str, bin_path: &str) -> String {
+    match shell {
+        "fish" => format!(r#"set -x PATH {} $PATH"#, bin_path),
+        _ => format!(r#"export PATH="{}:$PATH""#, bin_path),
+    }
+}
+
+#[rstest]
+#[case("bash")]
+#[case("fish")]
+#[case("zsh")]
+fn test_e2e_switch_changes_directory(#[case] shell: &str) {
+    if !is_shell_available(shell) {
+        eprintln!("Skipping test: {} not available", shell);
         return;
     }
 
     let repo = TestRepo::new();
     repo.commit("Initial commit");
 
-    let init_code = generate_init_code(&repo, "bash");
+    let init_code = generate_init_code(&repo, shell);
+    let bin_path = get_cargo_bin("wt")
+        .parent()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
 
-    // Create a script that:
-    // 1. Sources the init code
-    // 2. Runs wt switch to create and switch to a new branch
-    // 3. Prints the current directory
     let script = format!(
         r#"
-        export PATH="{}:$PATH"
+        {}
         {}
         wt switch --create my-feature
         pwd
         "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
+        path_export_syntax(shell, &bin_path),
         init_code
     );
 
-    let output = execute_shell_script(&repo, "bash", &script);
+    let output = execute_shell_script(&repo, shell, &script);
 
     // Verify that pwd shows we're in a worktree directory containing "my-feature"
     assert!(
@@ -102,10 +115,13 @@ fn test_bash_e2e_switch_changes_directory() {
     );
 }
 
-#[test]
-fn test_bash_e2e_finish_returns_to_main() {
-    if !is_shell_available("bash") {
-        eprintln!("Skipping test: bash not available");
+#[rstest]
+#[case("bash")]
+#[case("fish")]
+#[case("zsh")]
+fn test_e2e_finish_returns_to_main(#[case] shell: &str) {
+    if !is_shell_available(shell) {
+        eprintln!("Skipping test: {} not available", shell);
         return;
     }
 
@@ -113,27 +129,27 @@ fn test_bash_e2e_finish_returns_to_main() {
     repo.commit("Initial commit");
     repo.setup_remote("main");
 
-    let init_code = generate_init_code(&repo, "bash");
+    let init_code = generate_init_code(&repo, shell);
     let repo_path = repo.root_path().to_string_lossy().to_string();
+    let bin_path = get_cargo_bin("wt")
+        .parent()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
 
-    // Create a script that:
-    // 1. Sources the init code
-    // 2. Switches to a feature branch
-    // 3. Finishes the feature (returns to main)
-    // 4. Prints the current directory
     let script = format!(
         r#"
-        export PATH="{}:$PATH"
+        {}
         {}
         wt switch --create my-feature
         wt finish
         pwd
         "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
+        path_export_syntax(shell, &bin_path),
         init_code
     );
 
-    let output = execute_shell_script(&repo, "bash", &script);
+    let output = execute_shell_script(&repo, shell, &script);
 
     // Verify that pwd shows we're back in the main repo directory
     assert!(
@@ -178,147 +194,6 @@ fn test_bash_e2e_switch_preserves_output() {
     assert!(
         !output.contains("__WORKTRUNK_CD__"),
         "Directives should not be visible to user, got: {}",
-        output
-    );
-}
-
-#[test]
-fn test_fish_e2e_switch_changes_directory() {
-    if !is_shell_available("fish") {
-        eprintln!("Skipping test: fish not available");
-        return;
-    }
-
-    let repo = TestRepo::new();
-    repo.commit("Initial commit");
-
-    let init_code = generate_init_code(&repo, "fish");
-
-    // Fish uses different syntax for sourcing code
-    let script = format!(
-        r#"
-        set -x PATH {} $PATH
-        {}
-        wt switch --create my-feature
-        pwd
-        "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
-        init_code
-    );
-
-    let output = execute_shell_script(&repo, "fish", &script);
-
-    // Verify that pwd shows we're in a worktree directory containing "my-feature"
-    assert!(
-        output.contains("my-feature"),
-        "Expected pwd to show my-feature worktree, got: {}",
-        output
-    );
-}
-
-#[test]
-fn test_fish_e2e_finish_returns_to_main() {
-    if !is_shell_available("fish") {
-        eprintln!("Skipping test: fish not available");
-        return;
-    }
-
-    let mut repo = TestRepo::new();
-    repo.commit("Initial commit");
-    repo.setup_remote("main");
-
-    let init_code = generate_init_code(&repo, "fish");
-    let repo_path = repo.root_path().to_string_lossy().to_string();
-
-    let script = format!(
-        r#"
-        set -x PATH {} $PATH
-        {}
-        wt switch --create my-feature
-        wt finish
-        pwd
-        "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
-        init_code
-    );
-
-    let output = execute_shell_script(&repo, "fish", &script);
-
-    // Verify that pwd shows we're back in the main repo directory
-    assert!(
-        output.trim().ends_with(&repo_path),
-        "Expected pwd to show main repo at {}, got: {}",
-        repo_path,
-        output
-    );
-}
-
-#[test]
-fn test_zsh_e2e_switch_changes_directory() {
-    if !is_shell_available("zsh") {
-        eprintln!("Skipping test: zsh not available");
-        return;
-    }
-
-    let repo = TestRepo::new();
-    repo.commit("Initial commit");
-
-    let init_code = generate_init_code(&repo, "zsh");
-
-    let script = format!(
-        r#"
-        export PATH="{}:$PATH"
-        {}
-        wt switch --create my-feature
-        pwd
-        "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
-        init_code
-    );
-
-    let output = execute_shell_script(&repo, "zsh", &script);
-
-    // Verify that pwd shows we're in a worktree directory containing "my-feature"
-    assert!(
-        output.contains("my-feature"),
-        "Expected pwd to show my-feature worktree, got: {}",
-        output
-    );
-}
-
-#[test]
-fn test_zsh_e2e_finish_returns_to_main() {
-    if !is_shell_available("zsh") {
-        eprintln!("Skipping test: zsh not available");
-        return;
-    }
-
-    let mut repo = TestRepo::new();
-    repo.commit("Initial commit");
-    repo.setup_remote("main");
-
-    let init_code = generate_init_code(&repo, "zsh");
-    let repo_path = repo.root_path().to_string_lossy().to_string();
-
-    let script = format!(
-        r#"
-        export PATH="{}:$PATH"
-        {}
-        wt switch --create my-feature
-        wt finish
-        pwd
-        "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
-        init_code
-    );
-
-    let output = execute_shell_script(&repo, "zsh", &script);
-
-    // Verify that pwd shows we're back in the main repo directory
-    assert!(
-        output.trim().ends_with(&repo_path),
-        "Expected pwd to show main repo at {}, got: {}",
-        repo_path,
         output
     );
 }
@@ -402,10 +277,12 @@ fn test_bash_e2e_error_handling() {
     );
 }
 
-#[test]
-fn test_bash_e2e_prompt_hook() {
-    if !is_shell_available("bash") {
-        eprintln!("Skipping test: bash not available");
+#[rstest]
+#[case("bash")]
+#[case("fish")]
+fn test_e2e_prompt_hook(#[case] shell: &str) {
+    if !is_shell_available(shell) {
+        eprintln!("Skipping test: {} not available", shell);
         return;
     }
 
@@ -416,78 +293,32 @@ fn test_bash_e2e_prompt_hook() {
     let mut cmd = Command::new(get_cargo_bin("wt"));
     repo.clean_cli_env(&mut cmd);
     let output = cmd
-        .args(["init", "bash", "--hook", "prompt"])
+        .args(["init", shell, "--hook", "prompt"])
         .current_dir(repo.root_path())
         .output()
         .expect("Failed to generate init code");
 
     let init_code = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    let bin_path = get_cargo_bin("wt")
+        .parent()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
 
     // Verify prompt hook function exists and can be called
     let script = format!(
         r#"
-        export PATH="{}:$PATH"
+        {}
         {}
         type _wt_prompt_hook 2>&1
         _wt_prompt_hook 2>&1
         echo "HOOK_EXECUTED"
         "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
+        path_export_syntax(shell, &bin_path),
         init_code
     );
 
-    let output = execute_shell_script(&repo, "bash", &script);
-
-    // Verify hook function exists
-    assert!(
-        output.contains("_wt_prompt_hook is a function") || output.contains("function"),
-        "Expected prompt hook function to be defined, got: {}",
-        output
-    );
-
-    // Verify hook executed successfully
-    assert!(
-        output.contains("HOOK_EXECUTED"),
-        "Expected prompt hook to execute without error, got: {}",
-        output
-    );
-}
-
-#[test]
-fn test_fish_e2e_prompt_hook() {
-    if !is_shell_available("fish") {
-        eprintln!("Skipping test: fish not available");
-        return;
-    }
-
-    let repo = TestRepo::new();
-    repo.commit("Initial commit");
-
-    // Generate init code with prompt hook
-    let mut cmd = Command::new(get_cargo_bin("wt"));
-    repo.clean_cli_env(&mut cmd);
-    let output = cmd
-        .args(["init", "fish", "--hook", "prompt"])
-        .current_dir(repo.root_path())
-        .output()
-        .expect("Failed to generate init code");
-
-    let init_code = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-
-    // Verify prompt hook function exists and can be called
-    let script = format!(
-        r#"
-        set -x PATH {} $PATH
-        {}
-        type _wt_prompt_hook 2>&1
-        _wt_prompt_hook 2>&1
-        echo "HOOK_EXECUTED"
-        "#,
-        get_cargo_bin("wt").parent().unwrap().to_string_lossy(),
-        init_code
-    );
-
-    let output = execute_shell_script(&repo, "fish", &script);
+    let output = execute_shell_script(&repo, shell, &script);
 
     // Verify hook function exists
     assert!(
