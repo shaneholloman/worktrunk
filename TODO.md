@@ -69,7 +69,7 @@ Command-line interface with rich user experience.
 - Error messages with actionable suggestions
 - Subcommand structure (switch, finish, push, merge)
 
-**Dependencies:** `clap` for argument parsing, `colored` or `owo-colors` for terminal colors
+**Dependencies:** `clap` for argument parsing, `anstream`/`anstyle` for terminal colors (from rust-cli ecosystem)
 
 ### 5. External Integrations
 Interface with shell and external tools.
@@ -417,3 +417,33 @@ tempfile = "3.14"       # For temporary test directories
 - [ ] Handles edge cases gracefully (dirty state, conflicts, missing directories)
 - [ ] Integrates with shell for directory changes
 - [ ] Passes integration tests with real git repositories
+
+## Future Enhancements
+
+### Table Formatting for Output
+
+Currently using plain text output. Consider adding table formatting for commands like `wt list` to improve readability.
+
+**Options researched:**
+
+1. **tabled** (https://github.com/zhiburt/tabled)
+   - Derive-based approach (`#[derive(Tabled)]` on structs)
+   - Extensive styling options and themes
+   - Well-maintained, active development
+   - Best for: Direct struct-to-table rendering
+
+2. **comfy-table** (https://github.com/Nukesor/comfy-table)
+   - Manual table building with excellent content wrapping
+   - Rock-solid, considered "finished" (minimal breaking changes)
+   - Very well tested, no unsafe code
+   - Best for: Dynamic tables with manual control
+
+3. **cli-table** (https://github.com/devashishdxt/cli-table)
+   - Middle ground between tabled and comfy-table
+   - Supports both derive and manual building
+
+**Compatibility:**
+- All three libraries support `anstyle` for colors, integrating well with our existing rust-cli ecosystem dependencies
+- The `rust-cli` organization doesn't have a dedicated table library, so we'd need to use a third-party crate
+
+**Decision:** Deferred until we have clearer requirements for table formatting. Current plain text output is functional.
