@@ -13,7 +13,7 @@ fn snapshot_merge(test_name: &str, repo: &TestRepo, args: &[&str], cwd: Option<&
     for (name, path) in &repo.worktrees {
         settings.add_filter(
             path.to_str().unwrap(),
-            format!("[WORKTREE_{}]", name.to_uppercase().replace('-', "_")),
+            &format!("[WORKTREE_{}]", name.to_uppercase().replace('-', "_")),
         );
     }
 

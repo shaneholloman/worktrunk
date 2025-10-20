@@ -2,8 +2,9 @@ use clap::{Parser, Subcommand};
 use std::process;
 use worktrunk::git::{
     GitError, branch_exists, count_commits, get_changed_files, get_current_branch,
-    get_default_branch, get_git_common_dir, get_worktree_root, has_merge_commits, is_ancestor,
-    is_dirty, is_dirty_in, is_in_worktree, list_worktrees, worktree_for_branch,
+    get_current_branch_in, get_default_branch, get_git_common_dir, get_worktree_root,
+    has_merge_commits, is_ancestor, is_dirty, is_dirty_in, is_in_worktree, list_worktrees,
+    worktree_for_branch,
 };
 use worktrunk::shell;
 
@@ -75,10 +76,6 @@ enum Commands {
         /// Target branch to merge into (defaults to default branch)
         target: Option<String>,
 
-        /// Squash commits before merging
-        #[arg(short, long)]
-        squash: bool,
-
         /// Keep worktree after merging (don't finish)
         #[arg(short, long)]
         keep: bool,
@@ -110,11 +107,7 @@ fn main() {
             target,
             allow_merge_commits,
         } => handle_push(target.as_deref(), allow_merge_commits),
-        Commands::Merge {
-            target,
-            squash,
-            keep,
-        } => handle_merge(target.as_deref(), squash, keep),
+        Commands::Merge { target, keep } => handle_merge(target.as_deref(), keep),
         Commands::Hook { hook_type } => handle_hook(&hook_type).map_err(GitError::CommandFailed),
     };
 
@@ -235,37 +228,22 @@ fn handle_switch(
     let worktree_path = parent_dir.join(format!("{}.{}", repo_name, branch));
 
     // Create the worktree
-    let output = if create {
+    // Build git worktree add command
+    let mut args = vec!["worktree", "add", worktree_path.to_str().unwrap()];
+    if create {
+        args.push("-b");
+        args.push(branch);
         if let Some(base_branch) = base {
-            process::Command::new("git")
-                .args([
-                    "worktree",
-                    "add",
-                    worktree_path.to_str().unwrap(),
-                    "-b",
-                    branch,
-                    base_branch,
-                ])
-                .output()
-                .map_err(|e| GitError::CommandFailed(e.to_string()))?
-        } else {
-            process::Command::new("git")
-                .args([
-                    "worktree",
-                    "add",
-                    worktree_path.to_str().unwrap(),
-                    "-b",
-                    branch,
-                ])
-                .output()
-                .map_err(|e| GitError::CommandFailed(e.to_string()))?
+            args.push(base_branch);
         }
     } else {
-        process::Command::new("git")
-            .args(["worktree", "add", worktree_path.to_str().unwrap(), branch])
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?
-    };
+        args.push(branch);
+    }
+
+    let output = process::Command::new("git")
+        .args(&args)
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -484,7 +462,7 @@ fn handle_push(target: Option<&str>, allow_merge_commits: bool) -> Result<(), Gi
     Ok(())
 }
 
-fn handle_merge(target: Option<&str>, squash: bool, keep: bool) -> Result<(), GitError> {
+fn handle_merge(target: Option<&str>, keep: bool) -> Result<(), GitError> {
     // Get current branch
     let current_branch = get_current_branch()?
         .ok_or_else(|| GitError::CommandFailed("Not on a branch (detached HEAD)".to_string()))?;
@@ -508,39 +486,20 @@ fn handle_merge(target: Option<&str>, squash: bool, keep: bool) -> Result<(), Gi
         ));
     }
 
-    // Rebase onto target (or squash if requested)
-    if squash {
-        // For squash, we'll do an interactive rebase to squash commits
-        // For simplicity, we'll just rebase for now and note squash in message
-        println!("Rebasing and squashing commits onto '{}'...", target_branch);
+    // Rebase onto target
+    println!("Rebasing onto '{}'...", target_branch);
 
-        let rebase_result = process::Command::new("git")
-            .args(["rebase", &target_branch])
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+    let rebase_result = process::Command::new("git")
+        .args(["rebase", &target_branch])
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
 
-        if !rebase_result.status.success() {
-            let stderr = String::from_utf8_lossy(&rebase_result.stderr);
-            return Err(GitError::CommandFailed(format!(
-                "Failed to rebase onto '{}': {}",
-                target_branch, stderr
-            )));
-        }
-    } else {
-        println!("Rebasing onto '{}'...", target_branch);
-
-        let rebase_result = process::Command::new("git")
-            .args(["rebase", &target_branch])
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-        if !rebase_result.status.success() {
-            let stderr = String::from_utf8_lossy(&rebase_result.stderr);
-            return Err(GitError::CommandFailed(format!(
-                "Failed to rebase onto '{}': {}",
-                target_branch, stderr
-            )));
-        }
+    if !rebase_result.status.success() {
+        let stderr = String::from_utf8_lossy(&rebase_result.stderr);
+        return Err(GitError::CommandFailed(format!(
+            "Failed to rebase onto '{}': {}",
+            target_branch, stderr
+        )));
     }
 
     // Fast-forward push to target branch (reuse handle_push logic)
@@ -562,22 +521,22 @@ fn handle_merge(target: Option<&str>, squash: bool, keep: bool) -> Result<(), Gi
 
         handle_finish(false)?;
 
-        // Change to primary worktree directory so we can run git commands
-        std::env::set_current_dir(&primary_worktree_dir)
-            .map_err(|e| GitError::CommandFailed(format!("Failed to change directory: {}", e)))?;
-
-        // Try to switch to target branch
-        let new_branch = get_current_branch()?;
+        // Check if we need to switch to target branch
+        let new_branch = get_current_branch_in(&primary_worktree_dir)?;
         if new_branch.as_deref() != Some(&target_branch) {
             println!("Switching to '{}'...", target_branch);
             let switch_result = process::Command::new("git")
                 .args(["switch", &target_branch])
+                .current_dir(&primary_worktree_dir)
                 .output()
                 .map_err(|e| GitError::CommandFailed(e.to_string()))?;
 
             if !switch_result.status.success() {
-                // If switch fails, might be in another worktree - try using our switch command
-                handle_switch(&target_branch, false, None, false)?;
+                let stderr = String::from_utf8_lossy(&switch_result.stderr);
+                return Err(GitError::CommandFailed(format!(
+                    "Failed to switch to '{}': {}",
+                    target_branch, stderr
+                )));
             }
         }
     } else {
