@@ -297,6 +297,9 @@ fn execute_command_in_worktree(
         .arg(shell_arg)
         .arg(command)
         .current_dir(worktree_path)
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .status()
         .map_err(|e| GitError::CommandFailed(format!("Failed to execute command: {}", e)))?;
 
