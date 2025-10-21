@@ -1,5 +1,6 @@
+use std::io::{self, Write};
 use std::path::PathBuf;
-use worktrunk::config::WorktrunkConfig;
+use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{format_error, format_error_with_bold, format_hint};
 
@@ -184,7 +185,12 @@ pub fn handle_switch(
     }
 
     // Canonicalize the path for cleaner display
-    let canonical_path = worktree_path.canonicalize().unwrap_or(worktree_path);
+    let canonical_path = worktree_path
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_path.clone());
+
+    // Execute post-start commands from project config
+    execute_post_start_commands(&canonical_path, &repo, config)?;
 
     Ok(SwitchResult::CreatedWorktree {
         path: canonical_path,
@@ -326,6 +332,143 @@ fn check_worktree_conflicts(
             "Commit or stash changes in {} first",
             wt_path.display()
         )));
+    }
+
+    Ok(())
+}
+
+/// Execute a command in the specified worktree directory
+fn execute_command_in_worktree(
+    worktree_path: &std::path::Path,
+    command: &str,
+) -> Result<(), GitError> {
+    use std::process::Command;
+
+    // Use platform-specific shell
+    #[cfg(target_os = "windows")]
+    let (shell, shell_arg) = ("cmd", "/C");
+    #[cfg(not(target_os = "windows"))]
+    let (shell, shell_arg) = ("sh", "-c");
+
+    let output = Command::new(shell)
+        .arg(shell_arg)
+        .arg(command)
+        .current_dir(worktree_path)
+        .output()
+        .map_err(|e| GitError::CommandFailed(format!("Failed to execute command: {}", e)))?;
+
+    // Forward stdout/stderr to user
+    std::io::stdout().write_all(&output.stdout).ok();
+    std::io::stderr().write_all(&output.stderr).ok();
+
+    if !output.status.success() {
+        return Err(GitError::CommandFailed(format!(
+            "Command '{}' exited with status: {}",
+            command,
+            output.status.code().unwrap_or(-1)
+        )));
+    }
+
+    Ok(())
+}
+
+/// Prompt the user to approve a command for execution
+fn prompt_for_approval(command: &str, project_id: &str) -> io::Result<bool> {
+    eprintln!();
+    eprintln!("⚠️  Project '{}' wants to run a command:", project_id);
+    eprintln!();
+    eprintln!("    {}", command);
+    eprintln!();
+    eprintln!("⚠️  WARNING: This will execute with FULL SHELL ACCESS in the new worktree.");
+    eprintln!("   The command can read/write files, access network, run arbitrary code.");
+    eprintln!();
+    eprint!("Approve and remember for this project? [y/N] ");
+    io::stderr().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+
+    let response = input.trim().to_lowercase();
+    Ok(response == "y" || response == "yes")
+}
+
+/// Execute post-start commands from project config
+fn execute_post_start_commands(
+    worktree_path: &std::path::Path,
+    repo: &Repository,
+    config: &WorktrunkConfig,
+) -> Result<(), GitError> {
+    // Load project config
+    let repo_root = repo.repo_root()?;
+    let config_path = repo_root.join(".config").join("wt.toml");
+    let project_config = match ProjectConfig::load(&repo_root) {
+        Ok(Some(cfg)) => cfg,
+        Ok(None) => return Ok(()), // No project config
+        Err(e) => {
+            eprintln!(
+                "Warning: Failed to load project config from {}",
+                config_path.display()
+            );
+            eprintln!("Error: {}", e);
+            eprintln!("Skipping post-start commands. Check TOML syntax if file exists.");
+            return Ok(());
+        }
+    };
+
+    if project_config.post_start_commands.is_empty() {
+        return Ok(());
+    }
+
+    // Get project identifier
+    let project_id = repo.project_identifier()?;
+
+    // Execute each command
+    for command in &project_config.post_start_commands {
+        // Check if command is already approved
+        let approved = if config.is_command_approved(&project_id, command) {
+            true
+        } else {
+            // Prompt for approval
+            match prompt_for_approval(command, &project_id) {
+                Ok(true) => {
+                    // Reload config and save approval
+                    match WorktrunkConfig::load() {
+                        Ok(mut fresh_config) => {
+                            if let Err(e) =
+                                fresh_config.approve_command(project_id.clone(), command.clone())
+                            {
+                                eprintln!("Warning: Failed to save command approval: {}", e);
+                                eprintln!("You will be prompted again next time.");
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "Warning: Failed to reload config for saving approval: {}",
+                                e
+                            );
+                            eprintln!("You will be prompted again next time.");
+                        }
+                    }
+                    true
+                }
+                Ok(false) => {
+                    eprintln!("Skipping command: {}", command);
+                    false
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to read user input: {}", e);
+                    false
+                }
+            }
+        };
+
+        if approved {
+            eprintln!("Executing: {}", command);
+            if let Err(e) = execute_command_in_worktree(worktree_path, command) {
+                eprintln!("Warning: Command failed: {}", e);
+                // Continue with other commands even if one fails
+            }
+        }
     }
 
     Ok(())

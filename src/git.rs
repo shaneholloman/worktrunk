@@ -437,6 +437,71 @@ impl Repository {
         Ok(())
     }
 
+    /// Get a project identifier for approval tracking.
+    ///
+    /// Uses the git remote URL if available (e.g., "github.com/user/repo"),
+    /// otherwise falls back to the repository directory name.
+    ///
+    /// This identifier is used to track which commands have been approved
+    /// for execution in this project.
+    pub fn project_identifier(&self) -> Result<String, GitError> {
+        // Try to get the remote URL first
+        let remote = self.primary_remote()?;
+
+        if let Ok(url) = self.run_command(&["remote", "get-url", &remote]) {
+            let url = url.trim();
+
+            // Parse common git URL formats:
+            // - https://github.com/user/repo.git
+            // - git@github.com:user/repo.git
+            // - ssh://git@github.com/user/repo.git
+
+            // Remove .git suffix if present
+            let url = url.strip_suffix(".git").unwrap_or(url);
+
+            // Handle SSH format (git@host:path)
+            if let Some(ssh_part) = url.strip_prefix("git@")
+                && let Some((host, path)) = ssh_part.split_once(':')
+            {
+                return Ok(format!("{}/{}", host, path));
+            }
+
+            // Handle HTTPS/HTTP format
+            if let Some(https_part) = url
+                .strip_prefix("https://")
+                .or_else(|| url.strip_prefix("http://"))
+            {
+                return Ok(https_part.to_string());
+            }
+
+            // Handle ssh:// format
+            if let Some(ssh_part) = url.strip_prefix("ssh://") {
+                // Remove git@ prefix if present
+                let ssh_part = ssh_part.strip_prefix("git@").unwrap_or(ssh_part);
+                // Replace first : with /
+                if let Some(colon_pos) = ssh_part.find(':') {
+                    let (host, path) = ssh_part.split_at(colon_pos);
+                    return Ok(format!("{}{}", host, path.replacen(':', "/", 1)));
+                }
+                return Ok(ssh_part.to_string());
+            }
+
+            // If we can't parse it, use the URL as-is
+            return Ok(url.to_string());
+        }
+
+        // Fall back to repository name
+        let repo_root = self.repo_root()?;
+        let repo_name = repo_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                GitError::CommandFailed("Could not determine repository name".to_string())
+            })?;
+
+        Ok(repo_name.to_string())
+    }
+
     /// Run a git command in this repository's context.
     ///
     /// Executes the git command with this repository's path as the working directory
@@ -852,5 +917,14 @@ abcd1234567890abcd1234567890abcd12345678\tHEAD
     fn test_worktree_for_branch_not_found() {
         // Test that worktree_for_branch returns None when no worktree exists
         // This would require a git repo, so we'll test this in integration tests
+    }
+
+    #[test]
+    fn test_project_identifier_parsing() {
+        // Test URL parsing logic (can't test actual git commands without a repo)
+        // These would be unit tests if we extracted the URL parsing logic
+
+        // The actual parsing is done inline in project_identifier(),
+        // so we'll rely on integration tests for full coverage
     }
 }

@@ -2,6 +2,7 @@ use config::{Config, ConfigError, File};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use toml;
 
 /// Configuration for worktree path formatting and LLM integration.
 ///
@@ -43,6 +44,10 @@ pub struct WorktrunkConfig {
 
     #[serde(default)]
     pub llm: LlmConfig,
+
+    /// Commands that have been approved for automatic execution
+    #[serde(default, rename = "approved-commands")]
+    pub approved_commands: Vec<ApprovedCommand>,
 }
 
 /// Configuration for LLM integration
@@ -57,11 +62,29 @@ pub struct LlmConfig {
     pub args: Vec<String>,
 }
 
+/// Project-specific configuration (stored in .config/wt.toml within the project)
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ProjectConfig {
+    /// Commands to execute after creating a new worktree
+    #[serde(default, rename = "post-start-commands")]
+    pub post_start_commands: Vec<String>,
+}
+
+/// Approved command for automatic execution
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ApprovedCommand {
+    /// Project identifier (git remote URL or repo name)
+    pub project: String,
+    /// Command that was approved
+    pub command: String,
+}
+
 impl Default for WorktrunkConfig {
     fn default() -> Self {
         Self {
             worktree_path: "../{repo}.{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         }
     }
 }
@@ -123,6 +146,65 @@ fn get_config_path() -> Option<PathBuf> {
     ProjectDirs::from("", "", "worktrunk").map(|dirs| dirs.config_dir().join("config.toml"))
 }
 
+impl ProjectConfig {
+    /// Load project configuration from .config/wt.toml in the repository root
+    pub fn load(repo_root: &std::path::Path) -> Result<Option<Self>, ConfigError> {
+        let config_path = repo_root.join(".config").join("wt.toml");
+
+        if !config_path.exists() {
+            return Ok(None);
+        }
+
+        let config = Config::builder()
+            .add_source(File::from(config_path))
+            .build()?;
+
+        Ok(Some(config.try_deserialize()?))
+    }
+}
+
+impl WorktrunkConfig {
+    /// Check if a command is approved for the given project
+    pub fn is_command_approved(&self, project: &str, command: &str) -> bool {
+        self.approved_commands
+            .iter()
+            .any(|ac| ac.project == project && ac.command == command)
+    }
+
+    /// Add an approved command and save to config file
+    pub fn approve_command(&mut self, project: String, command: String) -> Result<(), ConfigError> {
+        // Don't add duplicates
+        if self.is_command_approved(&project, &command) {
+            return Ok(());
+        }
+
+        self.approved_commands
+            .push(ApprovedCommand { project, command });
+        self.save()
+    }
+
+    /// Save the current configuration to the config file
+    fn save(&self) -> Result<(), ConfigError> {
+        let config_path = get_config_path()
+            .ok_or_else(|| ConfigError::Message("Could not determine config path".to_string()))?;
+
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                ConfigError::Message(format!("Failed to create config directory: {}", e))
+            })?;
+        }
+
+        let toml_string = toml::to_string_pretty(self)
+            .map_err(|e| ConfigError::Message(format!("Failed to serialize config: {}", e)))?;
+
+        std::fs::write(&config_path, toml_string)
+            .map_err(|e| ConfigError::Message(format!("Failed to write config file: {}", e)))?;
+
+        Ok(())
+    }
+}
+
 fn validate_worktree_path(template: &str) -> Result<(), ConfigError> {
     if template.is_empty() {
         return Err(ConfigError::Message(
@@ -171,6 +253,7 @@ mod tests {
         let config = WorktrunkConfig {
             worktree_path: "{repo}.{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         };
         assert_eq!(
             config.format_path("myproject", "feature-x"),
@@ -183,6 +266,7 @@ mod tests {
         let config = WorktrunkConfig {
             worktree_path: "{repo}-{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         };
         assert_eq!(
             config.format_path("myproject", "feature-x"),
@@ -195,6 +279,7 @@ mod tests {
         let config = WorktrunkConfig {
             worktree_path: "{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         };
         assert_eq!(config.format_path("myproject", "feature-x"), "feature-x");
     }
@@ -205,6 +290,7 @@ mod tests {
         let config = WorktrunkConfig {
             worktree_path: "{repo}.{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         };
         assert_eq!(
             config.format_path("myproject", "feature/foo"),
@@ -217,6 +303,7 @@ mod tests {
         let config = WorktrunkConfig {
             worktree_path: "{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         };
         assert_eq!(
             config.format_path("myproject", "feature/sub/task"),
@@ -230,6 +317,7 @@ mod tests {
         let config = WorktrunkConfig {
             worktree_path: "{branch}".to_string(),
             llm: LlmConfig::default(),
+            approved_commands: Vec::new(),
         };
         assert_eq!(
             config.format_path("myproject", "feature\\foo"),
@@ -264,5 +352,89 @@ mod tests {
         assert!(validate_worktree_path(".worktrees/{branch}").is_ok());
         assert!(validate_worktree_path("../{repo}.{branch}").is_ok());
         assert!(validate_worktree_path("../../shared/{branch}").is_ok());
+    }
+
+    #[test]
+    fn test_project_config_default() {
+        let config = ProjectConfig::default();
+        assert!(config.post_start_commands.is_empty());
+    }
+
+    #[test]
+    fn test_project_config_serialization() {
+        let config = ProjectConfig {
+            post_start_commands: vec!["npm install".to_string(), "npm test".to_string()],
+        };
+        let toml = toml::to_string(&config).unwrap();
+        assert!(toml.contains("post-start-commands"));
+        assert!(toml.contains("npm install"));
+        assert!(toml.contains("npm test"));
+    }
+
+    #[test]
+    fn test_project_config_deserialization() {
+        let toml = r#"
+            post-start-commands = ["npm install", "npm test"]
+        "#;
+        let config: ProjectConfig = toml::from_str(toml).unwrap();
+        assert_eq!(config.post_start_commands.len(), 2);
+        assert_eq!(config.post_start_commands[0], "npm install");
+        assert_eq!(config.post_start_commands[1], "npm test");
+    }
+
+    #[test]
+    fn test_approved_command_equality() {
+        let cmd1 = ApprovedCommand {
+            project: "github.com/user/repo".to_string(),
+            command: "npm install".to_string(),
+        };
+        let cmd2 = ApprovedCommand {
+            project: "github.com/user/repo".to_string(),
+            command: "npm install".to_string(),
+        };
+        let cmd3 = ApprovedCommand {
+            project: "github.com/user/repo".to_string(),
+            command: "npm test".to_string(),
+        };
+        assert_eq!(cmd1, cmd2);
+        assert_ne!(cmd1, cmd3);
+    }
+
+    #[test]
+    fn test_is_command_approved() {
+        let mut config = WorktrunkConfig::default();
+        config.approved_commands.push(ApprovedCommand {
+            project: "github.com/user/repo".to_string(),
+            command: "npm install".to_string(),
+        });
+
+        assert!(config.is_command_approved("github.com/user/repo", "npm install"));
+        assert!(!config.is_command_approved("github.com/user/repo", "npm test"));
+        assert!(!config.is_command_approved("github.com/other/repo", "npm install"));
+    }
+
+    #[test]
+    fn test_approve_command() {
+        let mut config = WorktrunkConfig::default();
+
+        // First approval
+        assert!(!config.is_command_approved("github.com/user/repo", "npm install"));
+        config
+            .approve_command(
+                "github.com/user/repo".to_string(),
+                "npm install".to_string(),
+            )
+            .ok(); // Ignore save errors in tests
+        assert!(config.is_command_approved("github.com/user/repo", "npm install"));
+
+        // Duplicate approval shouldn't add twice
+        let count_before = config.approved_commands.len();
+        config
+            .approve_command(
+                "github.com/user/repo".to_string(),
+                "npm install".to_string(),
+            )
+            .ok();
+        assert_eq!(config.approved_commands.len(), count_before);
     }
 }

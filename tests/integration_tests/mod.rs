@@ -7,6 +7,7 @@ pub mod e2e_shell;
 pub mod init;
 pub mod list;
 pub mod merge;
+pub mod post_start_commands;
 pub mod push;
 pub mod remove;
 pub mod spacing_edge_cases;

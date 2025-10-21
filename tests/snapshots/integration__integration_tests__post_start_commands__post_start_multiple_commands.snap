@@ -1,0 +1,30 @@
+---
+source: tests/integration_tests/post_start_commands.rs
+info:
+  program: wt
+  args:
+    - switch
+    - "--create"
+    - feature
+  env:
+    CLICOLOR_FORCE: "1"
+    GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
+    GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
+    GIT_CONFIG_GLOBAL: /dev/null
+    GIT_CONFIG_SYSTEM: /dev/null
+    GIT_EDITOR: ""
+    LANG: C
+    LC_ALL: C
+    SOURCE_DATE_EPOCH: "1704067200"
+---
+success: true
+exit_code: 0
+----- stdout -----
+First
+Second
+Created new branch and worktree for 'feature' at [REPO].feature
+Note: Use 'wt switch' (with shell integration) for automatic cd
+
+----- stderr -----
+Executing: echo 'First'
+Executing: echo 'Second'
