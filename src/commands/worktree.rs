@@ -198,42 +198,6 @@ pub fn handle_switch(
     })
 }
 
-/// Execute a command in the specified worktree directory
-fn execute_command_in_worktree(
-    worktree_path: &std::path::Path,
-    command: &str,
-) -> Result<(), GitError> {
-    use std::io::Write;
-    use std::process::Command;
-
-    // Use platform-specific shell
-    #[cfg(target_os = "windows")]
-    let (shell, shell_arg) = ("cmd", "/C");
-    #[cfg(not(target_os = "windows"))]
-    let (shell, shell_arg) = ("sh", "-c");
-
-    let output = Command::new(shell)
-        .arg(shell_arg)
-        .arg(command)
-        .current_dir(worktree_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(format!("Failed to execute command: {}", e)))?;
-
-    // Forward stdout/stderr to user
-    std::io::stdout().write_all(&output.stdout).ok();
-    std::io::stderr().write_all(&output.stderr).ok();
-
-    if !output.status.success() {
-        return Err(GitError::CommandFailed(format!(
-            "Command '{}' exited with status: {}",
-            command,
-            output.status.code().unwrap_or(-1)
-        )));
-    }
-
-    Ok(())
-}
-
 pub fn handle_remove() -> Result<RemoveResult, GitError> {
     let repo = Repository::current();
 
