@@ -166,7 +166,13 @@ _arguments "${_arguments_options[@]}" : \
         (( CURRENT += 1 ))
         curcontext="${curcontext%:*:*}:wt-config-command-$line[1]:"
         case $line[1] in
-            (list)
+            (init)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(list)
 _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -276,9 +282,15 @@ _wt__completion_commands() {
 (( $+functions[_wt__config_commands] )) ||
 _wt__config_commands() {
     local commands; commands=(
+'init:Initialize global configuration file with examples' \
 'list:List all configuration files and their locations' \
     )
     _describe -t commands 'wt config commands' commands "$@"
+}
+(( $+functions[_wt__config__init_commands] )) ||
+_wt__config__init_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt config init commands' commands "$@"
 }
 (( $+functions[_wt__config__list_commands] )) ||
 _wt__config__list_commands() {

@@ -1,7 +1,53 @@
+use anstyle::{AnsiColor, Color};
 use etcetera::base_strategy::{BaseStrategy, choose_base_strategy};
 use std::path::PathBuf;
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{AnstyleStyle, HINT, HINT_EMOJI, println};
+
+/// Example configuration file content
+const CONFIG_EXAMPLE: &str = include_str!("../../config.example.toml");
+
+/// Handle the config init command
+pub fn handle_config_init() -> Result<(), GitError> {
+    let config_path = get_global_config_path().ok_or_else(|| {
+        GitError::CommandFailed("Could not determine global config path".to_string())
+    })?;
+
+    // Check if file already exists
+    if config_path.exists() {
+        let bold = AnstyleStyle::new().bold();
+        println!(
+            "Global config already exists: {bold}{}{bold:#}",
+            config_path.display()
+        );
+        println!();
+        println!("{HINT_EMOJI} {HINT}Use 'wt config list' to view existing configuration{HINT:#}");
+        return Ok(());
+    }
+
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            GitError::CommandFailed(format!("Failed to create config directory: {}", e))
+        })?;
+    }
+
+    // Write the example config
+    std::fs::write(&config_path, CONFIG_EXAMPLE)
+        .map_err(|e| GitError::CommandFailed(format!("Failed to write config file: {}", e)))?;
+
+    // Success message
+    let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+    let bold = AnstyleStyle::new().bold();
+    println!("✅ {green}Created config file{green:#}");
+    println!("   {bold}{}{bold:#}", config_path.display());
+    println!();
+    println!(
+        "{HINT_EMOJI} {HINT}Edit this file to customize worktree paths and LLM settings{HINT:#}"
+    );
+
+    Ok(())
+}
 
 /// Handle the config list command
 pub fn handle_config_list() -> Result<(), GitError> {
@@ -29,6 +75,7 @@ fn display_global_config() -> Result<(), GitError> {
     // Check if file exists
     if !config_path.exists() {
         println!("  {HINT_EMOJI} {HINT}Not found (using defaults){HINT:#}");
+        println!("  {HINT_EMOJI} {HINT}Run 'wt config init' to create a config file{HINT:#}");
         println!();
         println!("  {dim}# Default configuration:{dim:#}");
         println!("  {dim}worktree-path = \"../{{repo}}.{{branch}}\"{dim:#}");

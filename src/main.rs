@@ -11,9 +11,9 @@ mod llm;
 mod output;
 
 use commands::{
-    ConfigAction, Shell, handle_complete, handle_completion, handle_config_list,
-    handle_configure_shell, handle_init, handle_list, handle_merge, handle_push, handle_remove,
-    handle_switch,
+    ConfigAction, Shell, handle_complete, handle_completion, handle_config_init,
+    handle_config_list, handle_configure_shell, handle_init, handle_list, handle_merge,
+    handle_push, handle_remove, handle_switch,
 };
 use output::{handle_remove_output, handle_switch_output};
 
@@ -37,6 +37,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum ConfigCommand {
+    /// Initialize global configuration file with examples
+    Init,
     /// List all configuration files and their locations
     List,
 }
@@ -229,6 +231,7 @@ fn main() {
                 .map_err(GitError::CommandFailed)
         }
         Commands::Config { action } => match action {
+            ConfigCommand::Init => handle_config_init(),
             ConfigCommand::List => handle_config_list(),
         },
         Commands::List { format, branches } => handle_list(format, branches),

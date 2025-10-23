@@ -154,6 +154,9 @@ _wt() {
             wt,switch)
                 cmd="wt__switch"
                 ;;
+            wt__config,init)
+                cmd="wt__config__init"
+                ;;
             wt__config,list)
                 cmd="wt__config__list"
                 ;;
@@ -206,8 +209,22 @@ _wt() {
             return 0
             ;;
         wt__config)
-            opts="-h --help list"
+            opts="-h --help init list"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        wt__config__init)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi

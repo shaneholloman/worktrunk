@@ -159,8 +159,10 @@ zsh\t''"
 complete -c wt -n "__fish_wt_using_subcommand configure-shell" -l cmd -d 'Command prefix (default: wt)' -r
 complete -c wt -n "__fish_wt_using_subcommand configure-shell" -s y -l yes -d 'Skip confirmation prompt'
 complete -c wt -n "__fish_wt_using_subcommand configure-shell" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from list" -f -a "list" -d 'List all configuration files and their locations'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from init list" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from init list" -f -a "init" -d 'Initialize global configuration file with examples'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from init list" -f -a "list" -d 'List all configuration files and their locations'
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from init" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand list" -l format -d 'Output format' -r -f -a "table\t'Human-readable table format'
 json\t'JSON format'"
