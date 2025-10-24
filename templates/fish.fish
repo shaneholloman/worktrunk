@@ -110,8 +110,5 @@ if type -q {{ cmd_prefix }}
     end
 
     # Register dynamic completions
-    complete -c {{ cmd_prefix }} -n '__fish_seen_subcommand_from switch' -f -a '(__{{ cmd_prefix }}_complete)' -d 'Branch'
-    complete -c {{ cmd_prefix }} -n '__fish_seen_subcommand_from push' -f -a '(__{{ cmd_prefix }}_complete)' -d 'Target branch'
-    complete -c {{ cmd_prefix }} -n '__fish_seen_subcommand_from merge' -f -a '(__{{ cmd_prefix }}_complete)' -d 'Target branch'
-    complete -c {{ cmd_prefix }} -n '__fish_seen_subcommand_from remove' -f -a '(__{{ cmd_prefix }}_complete)' -d 'Branch to remove'
+{{ dynamic_completions }}
 end

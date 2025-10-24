@@ -131,10 +131,11 @@ if type -q wt
     end
 
     # Register dynamic completions
-    complete -c wt -n '__fish_seen_subcommand_from switch' -f -a '(__wt_complete)' -d 'Branch'
-    complete -c wt -n '__fish_seen_subcommand_from push' -f -a '(__wt_complete)' -d 'Target branch'
-    complete -c wt -n '__fish_seen_subcommand_from merge' -f -a '(__wt_complete)' -d 'Target branch'
-    complete -c wt -n '__fish_seen_subcommand_from remove' -f -a '(__wt_complete)' -d 'Branch to remove'
+    complete -c wt -n '__fish_seen_subcommand_from init' -f -a '(__wt_complete)' -d 'Shell to generate code for (bash, fish, zsh)'
+    complete -c wt -n '__fish_seen_subcommand_from switch' -f -a '(__wt_complete)' -d 'Branch name or worktree path'
+    complete -c wt -n '__fish_seen_subcommand_from remove' -f -a '(__wt_complete)' -d 'Worktree name or branch to remove (defaults to current worktree)'
+    complete -c wt -n '__fish_seen_subcommand_from push' -f -a '(__wt_complete)' -d 'Target branch (defaults to default branch)'
+    complete -c wt -n '__fish_seen_subcommand_from merge' -f -a '(__wt_complete)' -d 'Target branch to merge into (defaults to default branch)'
 end
 
 # Static completions (commands and flags)

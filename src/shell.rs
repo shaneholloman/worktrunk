@@ -253,6 +253,49 @@ impl Shell {
     }
 }
 
+/// Generate dynamic completion registrations for Fish shell by introspecting CLI structure
+///
+/// This generates completion registrations for all subcommands with positional arguments.
+/// The actual filtering of what completions to show is handled by the `wt complete` command,
+/// which checks the command context and only returns relevant completions.
+///
+/// This approach ensures that when new commands are added with positional arguments,
+/// they automatically get registered for completion - you only need to update the
+/// completion logic in `src/commands/completion.rs` to define what completions to show.
+fn generate_fish_dynamic_completions(cli_cmd: &clap::Command, cmd_prefix: &str) -> String {
+    cli_cmd
+        .get_subcommands()
+        .filter_map(|subcmd| {
+            let name = subcmd.get_name();
+
+            // Skip hidden commands (completion, complete)
+            if subcmd.is_hide_set() {
+                return None;
+            }
+
+            // Check if this subcommand has positional arguments
+            let has_positional = subcmd.get_positionals().next().is_some();
+            if !has_positional {
+                return None;
+            }
+
+            // Get description from the first positional argument's help text
+            let desc = subcmd
+                .get_positionals()
+                .next()
+                .and_then(|arg| arg.get_help())
+                .map(|h| h.to_string())
+                .unwrap_or_else(|| format!("{} argument", name));
+
+            Some(format!(
+                "    complete -c {} -n '__fish_seen_subcommand_from {}' -f -a '(__{}_complete)' -d '{}'",
+                cmd_prefix, name, cmd_prefix, desc
+            ))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Shell integration configuration
 pub struct ShellInit {
     pub shell: Shell,
@@ -265,7 +308,7 @@ impl ShellInit {
     }
 
     /// Generate shell integration code
-    pub fn generate(&self) -> Result<String, askama::Error> {
+    pub fn generate(&self, cli_cmd: &clap::Command) -> Result<String, askama::Error> {
         match self.shell {
             Shell::Bash | Shell::Zsh | Shell::Oil => {
                 let template = BashTemplate {
@@ -275,8 +318,11 @@ impl ShellInit {
                 template.render()
             }
             Shell::Fish => {
+                let dynamic_completions =
+                    generate_fish_dynamic_completions(cli_cmd, &self.cmd_prefix);
                 let template = FishTemplate {
                     cmd_prefix: &self.cmd_prefix,
+                    dynamic_completions,
                 };
                 template.render()
             }
@@ -321,6 +367,7 @@ struct BashTemplate<'a> {
 #[template(path = "fish.fish", escape = "none")]
 struct FishTemplate<'a> {
     cmd_prefix: &'a str,
+    dynamic_completions: String,
 }
 
 /// Nushell shell template

@@ -10,7 +10,7 @@ pub fn handle_init(shell_name: &str, cmd_name: &str, cli_cmd: &mut Command) -> R
 
     // Generate shell integration code
     let integration_output = init
-        .generate()
+        .generate(cli_cmd)
         .map_err(|e| format!("Failed to generate shell code: {}", e))?;
 
     println!("{}", integration_output);
