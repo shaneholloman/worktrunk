@@ -170,3 +170,43 @@ fn test_remove_by_name_dirty_target() {
         None,
     );
 }
+
+#[test]
+fn test_remove_multiple_worktrees() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create three worktrees
+    let _worktree_a = repo.add_worktree("feature-a", "feature-a");
+    let _worktree_b = repo.add_worktree("feature-b", "feature-b");
+    let _worktree_c = repo.add_worktree("feature-c", "feature-c");
+
+    // Remove all three at once from main repo
+    snapshot_remove(
+        "remove_multiple_worktrees",
+        &repo,
+        &["feature-a", "feature-b", "feature-c"],
+        None,
+    );
+}
+
+#[test]
+fn test_remove_multiple_including_current() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create three worktrees
+    let worktree_a = repo.add_worktree("feature-a", "feature-a");
+    let _worktree_b = repo.add_worktree("feature-b", "feature-b");
+    let _worktree_c = repo.add_worktree("feature-c", "feature-c");
+
+    // From worktree A, remove all three (including current)
+    snapshot_remove(
+        "remove_multiple_including_current",
+        &repo,
+        &["feature-a", "feature-b", "feature-c"],
+        Some(&worktree_a),
+    );
+}

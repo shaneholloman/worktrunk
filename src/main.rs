@@ -2,7 +2,7 @@ use anstyle::Style;
 use clap::{CommandFactory, Parser, Subcommand};
 use std::process;
 use worktrunk::config::WorktrunkConfig;
-use worktrunk::git::GitError;
+use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{SUCCESS_EMOJI, println};
 
 mod commands;
@@ -123,8 +123,8 @@ enum Commands {
 
     /// Finish current worktree, returning to primary if current
     Remove {
-        /// Worktree name or branch to remove (defaults to current worktree)
-        worktree: Option<String>,
+        /// Worktree names or branches to remove (defaults to current worktree if none specified)
+        worktrees: Vec<String>,
     },
 
     /// Push changes between worktrees
@@ -366,8 +366,50 @@ fn main() {
                 handle_switch(&branch, create, base.as_deref(), force, no_hooks, &config)
                     .and_then(|result| handle_switch_output(&result, &branch, execute.as_deref()))
             }),
-        Commands::Remove { worktree } => {
-            handle_remove(worktree.as_deref()).and_then(|result| handle_remove_output(&result))
+        Commands::Remove { worktrees } => {
+            if worktrees.is_empty() {
+                // No worktrees specified, remove current worktree
+                handle_remove(None).and_then(|result| handle_remove_output(&result))
+            } else {
+                // When removing multiple worktrees, we need to handle the current worktree last
+                // to avoid deleting the directory we're currently in
+                (|| -> Result<(), GitError> {
+                    let repo = Repository::current();
+                    let current_worktree = repo.worktree_root().ok();
+
+                    // Partition worktrees into current and others
+                    let mut others = Vec::new();
+                    let mut current = None;
+
+                    for worktree_name in worktrees.iter() {
+                        // Check if this is the current worktree by comparing branch names
+                        if let Ok(Some(worktree_path)) = repo.worktree_for_branch(worktree_name) {
+                            if Some(&worktree_path) == current_worktree.as_ref() {
+                                current = Some(worktree_name);
+                            } else {
+                                others.push(worktree_name);
+                            }
+                        } else {
+                            // Worktree doesn't exist or branch not found, will error when we try to remove
+                            others.push(worktree_name);
+                        }
+                    }
+
+                    // Remove others first
+                    for worktree in others.iter() {
+                        let result = handle_remove(Some(worktree.as_str()))?;
+                        handle_remove_output(&result)?;
+                    }
+
+                    // Remove current worktree last (if it was in the list)
+                    if let Some(current_name) = current {
+                        let result = handle_remove(Some(current_name.as_str()))?;
+                        handle_remove_output(&result)?;
+                    }
+
+                    Ok(())
+                })()
+            }
         }
         Commands::Push {
             target,
