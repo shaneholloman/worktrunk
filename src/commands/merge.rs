@@ -2,7 +2,7 @@ use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{
     AnstyleStyle, CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, GREEN, GREEN_BOLD, HINT, HINT_EMOJI,
-    eprintln, println,
+    eprintln, format_with_gutter, println,
 };
 
 use super::command_executor::{CommandContext, prepare_project_commands};
@@ -180,6 +180,29 @@ fn handle_merge_summary_output(
     Ok(())
 }
 
+/// Format a commit message with the first line in bold, ready for gutter display
+fn format_commit_message_for_display(message: &str) -> String {
+    let bold = AnstyleStyle::new().bold();
+    let lines: Vec<&str> = message.lines().collect();
+
+    if lines.is_empty() {
+        return String::new();
+    }
+
+    // Format first line in bold
+    let mut result = format!("{bold}{}{bold:#}", lines[0]);
+
+    // Add remaining lines without bold
+    if lines.len() > 1 {
+        for line in &lines[1..] {
+            result.push('\n');
+            result.push_str(line);
+        }
+    }
+
+    result
+}
+
 /// Commit uncommitted changes with LLM-generated message
 fn handle_commit_changes(
     custom_instruction: Option<&str>,
@@ -203,8 +226,15 @@ fn handle_commit_changes(
     }
 
     // Generate commit message
+    crate::output::progress(format!("🔄 {CYAN}Generating commit message...{CYAN:#}"))
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
     let commit_message =
         crate::llm::generate_commit_message(custom_instruction, commit_generation_config)?;
+
+    // Display the generated commit message
+    let formatted_message = format_commit_message_for_display(&commit_message);
+    print!("{}", format_with_gutter(&formatted_message, ""));
 
     // Commit
     repo.run_command(&["commit", "-m", &commit_message])
@@ -267,6 +297,11 @@ fn handle_squash(target_branch: &str) -> Result<Option<usize>, GitError> {
     let subjects = repo.commit_subjects(&range)?;
 
     // Load config and generate commit message
+    crate::output::progress(format!(
+        "🔄 {CYAN}Generating squash commit message...{CYAN:#}"
+    ))
+    .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
     let config = WorktrunkConfig::load()
         .map_err(|e| GitError::CommandFailed(format!("Failed to load config: {}", e)))?;
     let commit_message =
@@ -274,6 +309,10 @@ fn handle_squash(target_branch: &str) -> Result<Option<usize>, GitError> {
             .map_err(|e| {
                 GitError::CommandFailed(format!("Failed to generate commit message: {}", e))
             })?;
+
+    // Display the generated commit message
+    let formatted_message = format_commit_message_for_display(&commit_message);
+    print!("{}", format_with_gutter(&formatted_message, ""));
 
     // Reset to merge base (soft reset stages all changes)
     repo.run_command(&["reset", "--soft", &merge_base])
