@@ -43,12 +43,8 @@ pub fn handle_merge(
     let config = WorktrunkConfig::load()
         .map_err(|e| GitError::CommandFailed(format!("Failed to load config: {}", e)))?;
 
-    // Auto-commit uncommitted changes if they exist
-    if repo.is_dirty()? {
-        handle_commit_changes(message, &config.commit_generation)?;
-    }
-
     // Run pre-merge checks unless --no-verify was specified
+    // Do this BEFORE committing so we fail fast if checks won't pass
     if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
         let worktree_path = std::env::current_dir().map_err(|e| {
             GitError::CommandFailed(format!("Failed to get current directory: {}", e))
@@ -62,6 +58,12 @@ pub fn handle_merge(
             &config,
             force,
         )?;
+    }
+
+    // Auto-commit uncommitted changes if they exist
+    // Only do this after pre-merge checks pass
+    if repo.is_dirty()? {
+        handle_commit_changes(message, &config.commit_generation)?;
     }
 
     // Track operations for summary
