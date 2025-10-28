@@ -1,8 +1,6 @@
 use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
-use worktrunk::styling::{
-    AnstyleStyle, CYAN, CYAN_BOLD, eprint, eprintln, format_with_gutter, println,
-};
+use worktrunk::styling::{AnstyleStyle, CYAN, CYAN_BOLD, eprint, format_with_gutter, println};
 
 use super::command_executor::{CommandContext, prepare_project_commands};
 use super::worktree::handle_push;
@@ -360,14 +358,14 @@ fn run_pre_merge_commands(
         "Pre-merge commands",
         |_, command| {
             let dim = AnstyleStyle::new().dimmed();
-            eprintln!("{dim}Skipping pre-merge command: {command}{dim:#}");
+            println!("{dim}Skipping pre-merge command: {command}{dim:#}");
         },
     )?;
     for prepared in commands {
         use std::io::Write;
         use worktrunk::styling;
 
-        eprintln!(
+        println!(
             "🔄 {CYAN}Running pre-merge command {CYAN_BOLD}{name}{CYAN_BOLD:#}:{CYAN:#}",
             name = prepared.name
         );
@@ -424,7 +422,7 @@ fn execute_post_merge_commands(
         "Post-merge commands",
         |_, command| {
             let dim = AnstyleStyle::new().dimmed();
-            eprintln!("{dim}Skipping command: {command}{dim:#}");
+            println!("{dim}Skipping command: {command}{dim:#}");
         },
     )?;
 
@@ -435,7 +433,7 @@ fn execute_post_merge_commands(
     // Execute each command sequentially in the main worktree
     for prepared in commands {
         use std::io::Write;
-        eprintln!(
+        println!(
             "🔄 {CYAN}Running post-merge command {CYAN_BOLD}{name}{CYAN_BOLD:#}:{CYAN:#}",
             name = prepared.name
         );
@@ -445,7 +443,7 @@ fn execute_post_merge_commands(
         if let Err(e) = execute_command_in_worktree(main_worktree_path, &prepared.expanded) {
             use worktrunk::styling::WARNING_EMOJI;
             let warning_bold = WARNING.bold();
-            eprintln!(
+            println!(
                 "{WARNING_EMOJI} {WARNING}Command {warning_bold}{name}{warning_bold:#} failed: {e}{WARNING:#}",
                 name = prepared.name,
             );

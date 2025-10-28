@@ -4,6 +4,14 @@
 //! - anstream for auto-detecting color support
 //! - anstyle for composable styling
 //! - Semantic style constants for domain-specific use
+//!
+//! ## stdout vs stderr principle
+//!
+//! - **stdout**: ALL worktrunk output (messages, errors, warnings, directives, data)
+//! - **stderr**: ALL child process output (git, npm, user commands)
+//! - **Exception**: Interactive prompts use stderr so they appear even when stdout is redirected
+//!
+//! Use `println!` for all worktrunk messages. Use `eprintln!` only for interactive prompts.
 
 use anstyle::{AnsiColor, Color, Style};
 use synoptic::{TokOpt, from_extension};
@@ -55,10 +63,10 @@ pub const PROGRESS_EMOJI: &str = "🔄";
 /// Success emoji - use with GREEN style: `println!("{SUCCESS_EMOJI} {GREEN}message{GREEN:#}");`
 pub const SUCCESS_EMOJI: &str = "✅";
 
-/// Error emoji - use with ERROR style: `eprintln!("{ERROR_EMOJI} {ERROR}message{ERROR:#}");`
+/// Error emoji - use with ERROR style: `println!("{ERROR_EMOJI} {ERROR}message{ERROR:#}");`
 pub const ERROR_EMOJI: &str = "❌";
 
-/// Warning emoji - use with WARNING style: `eprintln!("{WARNING_EMOJI} {WARNING}message{WARNING:#}");`
+/// Warning emoji - use with WARNING style: `println!("{WARNING_EMOJI} {WARNING}message{WARNING:#}");`
 pub const WARNING_EMOJI: &str = "🟡";
 
 /// Hint emoji - use with HINT style: `println!("{HINT_EMOJI} {HINT}message{HINT:#}");`

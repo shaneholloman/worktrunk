@@ -12,11 +12,10 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpMcVP4R/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpf378rG/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -31,10 +30,10 @@ exit_code: 0
  1 file changed, 1 insertion(+)
 
 ✅ [32mPushed to [1m[32mmain[0m (1 commit, 1 file, [32m+1[0m)  [0m
+🔄 [36mRunning post-merge command [1m[36mcmd[0m:[0m
 🔄 [36mCleaning up worktree...[0m
 
 ✅ [32mReturned to primary at [REPO][0m
 
 ----- stderr -----
-🔄 [36mRunning post-merge command [1m[36mcmd[0m:[0m
 [40m [0m echo 'merged feature to main' > post-merge-ran.txt

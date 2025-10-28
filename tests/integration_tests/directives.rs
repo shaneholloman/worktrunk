@@ -173,7 +173,7 @@ fn test_merge_internal_keep() {
             .arg("--keep")
             .current_dir(&feature_wt);
 
-        assert_cmd_snapshot!(cmd, @"success: true\nexit_code: 0\n----- stdout -----\n\nKept worktree (use 'wt remove' to clean up)\0\n----- stderr -----\n\0");
+        assert_cmd_snapshot!(cmd, @"success: true\nexit_code: 0\n----- stdout -----\n\nKept worktree (use 'wt remove' to clean up)\0\n----- stderr -----");
     });
 }
 
@@ -229,6 +229,6 @@ fn test_merge_internal_remove() {
             .arg("main")
             .current_dir(&feature_wt);
 
-        assert_cmd_snapshot!(cmd, @"success: true\nexit_code: 0\n----- stdout -----\n__WORKTRUNK_CD__[PATH]\0\nReturned to primary at [REPO]\0\n----- stderr -----\n\0\0");
+        assert_cmd_snapshot!(cmd, @"success: true\nexit_code: 0\n----- stdout -----\n__WORKTRUNK_CD__[PATH]\0\nReturned to primary at [REPO]\0\n----- stderr -----");
     });
 }

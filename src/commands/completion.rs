@@ -15,7 +15,7 @@ use clap_complete::{Shell as CompletionShell, generate};
 use std::io;
 use worktrunk::git::{GitError, Repository};
 use worktrunk::shell::Shell;
-use worktrunk::styling::{ERROR, ERROR_EMOJI, eprintln};
+use worktrunk::styling::{ERROR, ERROR_EMOJI, println};
 
 pub fn handle_completion(shell: Shell, cli_cmd: &mut Command) {
     let completion_shell = match shell {
@@ -117,7 +117,7 @@ where
 {
     get_branches_fn().unwrap_or_else(|e| {
         if std::env::var("WT_DEBUG_COMPLETION").is_ok() {
-            eprintln!("{ERROR_EMOJI} {ERROR}Completion error: {e}{ERROR:#}");
+            println!("{ERROR_EMOJI} {ERROR}Completion error: {e}{ERROR:#}");
         }
         Vec::new()
     })

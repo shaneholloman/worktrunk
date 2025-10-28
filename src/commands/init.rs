@@ -1,7 +1,7 @@
 use clap::Command;
 use clap_complete::{Shell as CompletionShell, generate};
 use worktrunk::shell;
-use worktrunk::styling::{ERROR, ERROR_EMOJI, eprintln};
+use worktrunk::styling::{ERROR, ERROR_EMOJI, println};
 
 pub fn handle_init(shell_name: &str, cmd_name: &str, cli_cmd: &mut Command) -> Result<(), String> {
     let shell = shell_name.parse::<shell::Shell>()?;
@@ -21,7 +21,7 @@ pub fn handle_init(shell_name: &str, cmd_name: &str, cli_cmd: &mut Command) -> R
 
     // Check if shell supports completion
     if !shell.supports_completion() {
-        eprintln!("{ERROR_EMOJI} {ERROR}Completion not yet supported for {shell}{ERROR:#}");
+        println!("{ERROR_EMOJI} {ERROR}Completion not yet supported for {shell}{ERROR:#}");
         std::process::exit(1);
     }
 

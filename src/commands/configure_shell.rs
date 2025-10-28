@@ -335,11 +335,12 @@ fn configure_fish_file(
 
 fn prompt_for_confirmation(results: &[ConfigureResult]) -> Result<bool, String> {
     use anstyle::{AnsiColor, Color, Style};
-    use worktrunk::styling::{HINT_EMOJI, eprint};
+    use worktrunk::styling::{HINT_EMOJI, eprint, eprintln};
 
     let cyan = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)));
     let cyan_bold = cyan.bold();
 
+    // Interactive prompts go to stderr so they appear even when stdout is redirected
     eprintln!();
     eprintln!("{HINT_EMOJI} {cyan_bold}Configuration changes:{cyan_bold:#}");
     eprintln!();

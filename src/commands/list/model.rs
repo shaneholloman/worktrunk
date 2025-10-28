@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use std::path::PathBuf;
 use worktrunk::git::{GitError, Repository};
-use worktrunk::styling::{HINT, HINT_EMOJI, WARNING, WARNING_EMOJI, eprintln};
+use worktrunk::styling::{HINT, HINT_EMOJI, WARNING, WARNING_EMOJI, println};
 
 #[derive(serde::Serialize)]
 pub struct WorktreeInfo {
@@ -310,10 +310,10 @@ pub fn gather_list_data(
                 Ok(branch_info) => items.push(ListItem::Branch(branch_info)),
                 Err(e) => {
                     let warning_bold = WARNING.bold();
-                    eprintln!(
+                    println!(
                         "{WARNING_EMOJI} {WARNING}Failed to enrich branch {warning_bold}{branch}{warning_bold:#}: {e}{WARNING:#}"
                     );
-                    eprintln!(
+                    println!(
                         "{HINT_EMOJI} {HINT}This branch will be shown with limited information{HINT:#}"
                     );
                 }

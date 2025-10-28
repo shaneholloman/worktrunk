@@ -105,7 +105,7 @@ use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{
     ADDITION, AnstyleStyle, CYAN, CYAN_BOLD, DELETION, GREEN, GREEN_BOLD, SUCCESS_EMOJI, WARNING,
-    WARNING_EMOJI, eprint, eprintln, format_with_gutter,
+    WARNING_EMOJI, eprint, format_with_gutter, println,
 };
 
 use super::command_executor::{CommandContext, prepare_project_commands};
@@ -161,7 +161,7 @@ pub fn handle_switch(
 
     // Check if base flag was provided without create flag
     if base.is_some() && !create {
-        eprintln!(
+        println!(
             "{WARNING_EMOJI} {WARNING}--base flag is only used with --create, ignoring{WARNING:#}"
         );
     }
@@ -261,8 +261,8 @@ fn remove_current_worktree(repo: &Repository) -> Result<RemoveResult, GitError> 
 
         // Remove the worktree
         if let Err(e) = repo.remove_worktree(&worktree_root) {
-            eprintln!("{WARNING_EMOJI} {WARNING}Failed to remove worktree: {e}{WARNING:#}");
-            eprintln!(
+            println!("{WARNING_EMOJI} {WARNING}Failed to remove worktree: {e}{WARNING:#}");
+            println!(
                 "You may need to run 'git worktree remove {}' manually",
                 worktree_root.display()
             );
@@ -320,8 +320,8 @@ fn remove_worktree_by_name(repo: &Repository, branch_name: &str) -> Result<Remov
 
     // Remove the worktree
     if let Err(e) = repo.remove_worktree(&worktree_path) {
-        eprintln!("{WARNING_EMOJI} {WARNING}Failed to remove worktree: {e}{WARNING:#}");
-        eprintln!(
+        println!("{WARNING_EMOJI} {WARNING}Failed to remove worktree: {e}{WARNING:#}");
+        println!(
             "You may need to run 'git worktree remove {}' manually",
             worktree_path.display()
         );
@@ -419,7 +419,7 @@ fn execute_post_create_commands(
         "Post-create commands",
         |_, command| {
             let dim = AnstyleStyle::new().dimmed();
-            eprintln!("{dim}Skipping command: {command}{dim:#}");
+            println!("{dim}Skipping command: {command}{dim:#}");
         },
     )?;
 
@@ -430,13 +430,13 @@ fn execute_post_create_commands(
     // Execute each command sequentially
     for prepared in commands {
         use std::io::Write;
-        eprintln!("🔄 {CYAN}Executing (post-create):{CYAN:#}");
+        println!("🔄 {CYAN}Executing (post-create):{CYAN:#}");
         eprint!("{}", format_with_gutter(&prepared.expanded, "", None)); // Gutter at column 0
         let _ = std::io::stderr().flush();
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
             let warning_bold = WARNING.bold();
-            eprintln!(
+            println!(
                 "{WARNING_EMOJI} {WARNING}Command {warning_bold}{name}{warning_bold:#} failed: {e}{WARNING:#}",
                 name = prepared.name,
             );
@@ -478,7 +478,7 @@ fn spawn_post_start_commands(
         "Post-start commands",
         |_, command| {
             let dim = AnstyleStyle::new().dimmed();
-            eprintln!("{dim}Skipping command: {command}{dim:#}");
+            println!("{dim}Skipping command: {command}{dim:#}");
         },
     )?;
 
@@ -489,7 +489,7 @@ fn spawn_post_start_commands(
     // Spawn each command as a detached background process
     for prepared in commands {
         use std::io::Write;
-        eprintln!("🔄 {CYAN}Starting (background):{CYAN:#}");
+        println!("🔄 {CYAN}Starting (background):{CYAN:#}");
         eprint!("{}", format_with_gutter(&prepared.expanded, "", None));
         let _ = std::io::stderr().flush();
 
@@ -499,7 +499,7 @@ fn spawn_post_start_commands(
                 // Log file path not shown - only needed for debugging failures
             }
             Err(e) => {
-                eprintln!(
+                println!(
                     "{WARNING_EMOJI} {WARNING}Failed to spawn '{name}': {e}{WARNING:#}",
                     name = prepared.name,
                 );

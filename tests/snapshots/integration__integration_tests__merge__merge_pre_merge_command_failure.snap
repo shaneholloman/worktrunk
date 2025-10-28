@@ -12,19 +12,18 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpAVDI3d/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpV2uaP9/test-config.toml
 ---
 success: false
 exit_code: 1
 ----- stdout -----
 🔄 [36mValidating merge...[0m
+🔄 [36mRunning pre-merge command [1m[36mcmd[0m:[0m
 
 ----- stderr -----
-🔄 [36mRunning pre-merge command [1m[36mcmd[0m:[0m
 [40m [0m exit 1
 ❌ [31mPre-merge command failed: [1m[31mcmd[0m[0m
 

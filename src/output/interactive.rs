@@ -56,9 +56,10 @@ impl InteractiveOutput {
             )));
         }
 
-        // Print output directly (we're already inside the output framework)
+        // Print child command output to stderr (all child output goes to stderr)
         if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout).trim_end());
+            use worktrunk::styling::eprintln;
+            eprintln!("{}", String::from_utf8_lossy(&output.stdout).trim_end());
         }
         if !output.stderr.is_empty() {
             use worktrunk::styling::eprintln;

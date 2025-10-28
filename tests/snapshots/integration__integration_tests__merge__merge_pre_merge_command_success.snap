@@ -12,16 +12,16 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpy2PylD/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpv4BWZG/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 🔄 [36mValidating merge...[0m
+🔄 [36mRunning pre-merge command [1m[36mcmd[0m:[0m
 🔄 [36mRebasing onto [1m[36mmain[0m...[0m
 🔄 [36mPushing 1 commit to [1m[36mmain[0m @ [SHA][0m
 
@@ -36,5 +36,4 @@ exit_code: 0
 ✅ [32mReturned to primary at [REPO][0m
 
 ----- stderr -----
-🔄 [36mRunning pre-merge command [1m[36mcmd[0m:[0m
 [40m [0m exit 0

@@ -12,29 +12,28 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: [TEST_CONFIG]
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpJGXiTv/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
+🔄 [36mExecuting (post-create):[0m
+🔄 [36mExecuting (post-create):[0m
+🔄 [36mExecuting (post-create):[0m
+🔄 [36mExecuting (post-create):[0m
 ✅ [32mCreated new worktree for [1mfeature/test[0m at [REPO].feature-test[0m
 
 To enable automatic cd, run: wt configure-shell
 
 ----- stderr -----
-🔄 [36mExecuting (post-create):[0m
 [40m [0m echo 'Repo: test-repo' > info.txt
-🔄 [36mExecuting (post-create):[0m
 [40m [0m echo 'Branch: feature-test' >> info.txt
-🔄 [36mExecuting (post-create):[0m
 [40m [0m echo 'Worktree:
 [40m [0m [REPO].feature-test'
 [40m [0m >> info.txt
-🔄 [36mExecuting (post-create):[0m
 [40m [0m echo 'Root:
 [40m [0m [REPO]'
 [40m [0m >> info.txt

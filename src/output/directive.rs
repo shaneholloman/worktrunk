@@ -15,10 +15,6 @@ impl DirectiveOutput {
     }
 
     pub fn success(&mut self, message: String) -> io::Result<()> {
-        // Ensure any prior stderr output is NUL-terminated before writing to stdout
-        write!(io::stderr(), "\0")?;
-        io::stderr().flush()?;
-
         let plain = strip_str(&message).to_string();
         write!(io::stdout(), "{}\0", plain)?;
         io::stdout().flush()
@@ -30,28 +26,17 @@ impl DirectiveOutput {
     }
 
     pub fn change_directory(&mut self, path: &Path) -> io::Result<()> {
-        // Ensure any prior stderr output is NUL-terminated before writing directive
-        // The shell wrapper merges stderr+stdout via 2>&1 and splits on NUL bytes,
-        // so we need to terminate stderr to prevent it from concatenating with directives
-        write!(io::stderr(), "\0")?;
-        io::stderr().flush()?;
-
         write!(io::stdout(), "__WORKTRUNK_CD__{}\0", path.display())?;
         io::stdout().flush()
     }
 
     pub fn execute(&mut self, command: String) -> io::Result<()> {
-        // Ensure any prior stderr output is NUL-terminated before writing directive
-        write!(io::stderr(), "\0")?;
-        io::stderr().flush()?;
-
         write!(io::stdout(), "__WORKTRUNK_EXEC__{}\0", command)?;
         io::stdout().flush()
     }
 
     pub fn flush(&mut self) -> io::Result<()> {
-        io::stdout().flush()?;
-        io::stderr().flush()
+        io::stdout().flush()
     }
 
     pub fn terminate_output(&mut self) -> io::Result<()> {
