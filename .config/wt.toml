@@ -1,3 +1,3 @@
 [pre-merge-check]
-check1 = "../tests/fixtures/mixed-output.sh check1 5"
-check2 = "../tests/fixtures/mixed-output.sh check2 5"
+check1 = "/Users/maximilian/workspace/worktrunk.stderr-out/tests/fixtures/mixed-output.sh check1 5"
+check2 = "/Users/maximilian/workspace/worktrunk.stderr-out/tests/fixtures/mixed-output.sh check2 5"
