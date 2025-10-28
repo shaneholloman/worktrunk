@@ -25,6 +25,7 @@ impl InteractiveOutput {
 
     pub fn progress(&mut self, message: String) -> io::Result<()> {
         println!("{message}");
+        io::stdout().flush()?;
         Ok(())
     }
 
