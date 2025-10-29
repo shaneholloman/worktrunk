@@ -310,9 +310,15 @@ impl ShellInit {
     /// Generate shell integration code
     pub fn generate(&self, cli_cmd: &clap::Command) -> Result<String, askama::Error> {
         match self.shell {
-            Shell::Bash | Shell::Zsh | Shell::Oil => {
+            Shell::Bash | Shell::Oil => {
                 let template = BashTemplate {
                     shell_name: self.shell.to_string(),
+                    cmd_prefix: &self.cmd_prefix,
+                };
+                template.render()
+            }
+            Shell::Zsh => {
+                let template = ZshTemplate {
                     cmd_prefix: &self.cmd_prefix,
                 };
                 template.render()
@@ -354,11 +360,18 @@ impl ShellInit {
     }
 }
 
-/// Bash/Zsh shell template
+/// Bash shell template
 #[derive(Template)]
 #[template(path = "bash.sh", escape = "none")]
 struct BashTemplate<'a> {
     shell_name: String,
+    cmd_prefix: &'a str,
+}
+
+/// Zsh shell template
+#[derive(Template)]
+#[template(path = "zsh.zsh", escape = "none")]
+struct ZshTemplate<'a> {
     cmd_prefix: &'a str,
 }
 

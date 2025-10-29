@@ -174,6 +174,26 @@ fn exec_in_pty(
 
     // Spawn the shell inside the PTY
     let mut cmd = CommandBuilder::new(shell);
+
+    // For zsh, isolate from user rc files to prevent TTY access issues
+    // User startup files (~/.zshenv, ~/.zshrc) can touch /dev/tty (e.g., stty, zle,
+    // compinit, GPG_TTY=$(tty)) which causes SIGTTIN/TTOU/TSTP signals when the
+    // process tries to access the controlling terminal.
+    // See: https://zsh.sourceforge.io/Doc/Release/Files.html
+    if shell == "zsh" {
+        // Set ZDOTDIR to /dev/null so ~/.zshenv is not found
+        cmd.env("ZDOTDIR", "/dev/null");
+
+        // Prevent loading any other rc files
+        cmd.arg("--no-rcs");
+        cmd.arg("-o");
+        cmd.arg("NO_GLOBAL_RCS");
+        cmd.arg("-o");
+        cmd.arg("NO_RCS");
+        cmd.arg("-o");
+        cmd.arg("NO_MONITOR");
+    }
+
     cmd.arg("-c");
     cmd.arg(script);
     cmd.cwd(working_dir);
@@ -285,24 +305,20 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    // TODO: Add zsh support
-    // Zsh currently uses the bash template (src/shell.rs:313), which includes bash-specific
-    // commands like `complete -F` and `COMP_WORDS` that don't exist in zsh.
-    // This causes zsh tests to hang waiting for the wrapper to execute.
-    // Need to create templates/zsh.zsh with proper zsh syntax:
-    // - Use `compdef` instead of `complete` for completions
-    // - Use zsh-specific completion system
-    // - Fix temp file cleanup (currently tries `\rm` which fails in test environment)
-
     // ========================================================================
     // Cross-Shell Error Handling Tests
     // ========================================================================
     //
     // These tests use parametrized testing to verify consistent behavior
-    // across all supported shells (bash, fish).
+    // across all supported shells (bash, zsh, fish).
+    //
+    // Note: Zsh tests run in isolated mode (--no-rcs, ZDOTDIR=/dev/null) to prevent
+    // user startup files from touching /dev/tty, which would cause SIGTTIN/TTOU/TSTP
+    // signals. This isolation ensures tests are deterministic across all environments.
 
     #[rstest]
     #[case("bash")]
+    #[case("zsh")]
     #[case("fish")]
     fn test_wrapper_handles_command_failure(#[case] shell: &str) {
         let mut repo = TestRepo::new();
@@ -337,6 +353,7 @@ mod tests {
 
     #[rstest]
     #[case("bash")]
+    #[case("zsh")]
     #[case("fish")]
     fn test_wrapper_switch_create(#[case] shell: &str) {
         let repo = TestRepo::new();
@@ -363,6 +380,7 @@ mod tests {
 
     #[rstest]
     #[case("bash")]
+    #[case("zsh")]
     #[case("fish")]
     fn test_wrapper_remove(#[case] shell: &str) {
         let mut repo = TestRepo::new();
@@ -383,6 +401,7 @@ mod tests {
 
     #[rstest]
     #[case("bash")]
+    #[case("zsh")]
     #[case("fish")]
     fn test_wrapper_merge(#[case] shell: &str) {
         let mut repo = TestRepo::new();
@@ -403,6 +422,7 @@ mod tests {
 
     #[rstest]
     #[case("bash")]
+    #[case("zsh")]
     #[case("fish")]
     fn test_wrapper_switch_with_execute(#[case] shell: &str) {
         let repo = TestRepo::new();

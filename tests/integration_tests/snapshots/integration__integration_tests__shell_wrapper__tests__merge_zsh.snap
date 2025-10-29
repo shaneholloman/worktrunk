@@ -1,0 +1,6 @@
+---
+source: tests/integration_tests/shell_wrapper.rs
+expression: output.normalized().as_ref()
+---
+zsh:365: command not found: compdef
+✅ [32mAlready on [1m[32mmain[0m, nothing to merge[0m
