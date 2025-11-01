@@ -3,7 +3,7 @@ use std::path::Path;
 use worktrunk::config::{CommandConfig, WorktrunkConfig, expand_template};
 use worktrunk::git::{GitError, Repository};
 
-use super::command_approval::{approve_command_batch, command_config_to_vec};
+use super::command_approval::approve_command_batch;
 
 #[derive(Debug)]
 pub struct PreparedCommand {
@@ -51,7 +51,7 @@ pub fn prepare_project_commands<F>(
 where
     F: FnMut(Option<&str>, &str),
 {
-    let commands = command_config_to_vec(command_config);
+    let commands = command_config.commands();
     if commands.is_empty() {
         return Ok(Vec::new());
     }
@@ -80,14 +80,14 @@ where
 
     if !auto_trust
         && !approve_command_batch(
-            &commands,
+            commands,
             &project_id,
             ctx.config,
             ctx.force,
             approval_context,
         )?
     {
-        for (name, command) in &commands {
+        for (name, command) in commands {
             on_skip(name.as_deref(), command);
         }
         return Err(GitError::CommandNotApproved);
@@ -100,9 +100,12 @@ where
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
 
-        let expanded = expand_template(&command, repo_name, ctx.branch, &extras_ref);
+        let expanded = expand_template(command, repo_name, ctx.branch, &extras_ref);
 
-        prepared.push(PreparedCommand { name, expanded });
+        prepared.push(PreparedCommand {
+            name: name.clone(),
+            expanded,
+        });
     }
 
     Ok(prepared)

@@ -140,7 +140,7 @@ pub struct CommitGenerationConfig {
 ///
 /// Merge-related commands (`pre-squash-command`, `pre-merge-command`, `post-merge-command`) also support:
 /// - `{target}` - Target branch for the merge (e.g., "main")
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct ProjectConfig {
     /// Commands to execute sequentially before worktree is ready (blocking)
     /// Supports string (single command), array (sequential), or table (named, sequential)
@@ -189,16 +189,95 @@ pub struct ProjectConfig {
     pub post_merge_command: Option<CommandConfig>,
 }
 
-/// Configuration for commands - supports multiple formats
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum CommandConfig {
-    /// Single command as a string
-    Single(String),
-    /// Multiple commands as an array
-    Multiple(Vec<String>),
-    /// Named commands as a table (map)
-    Named(std::collections::HashMap<String, String>),
+/// Configuration for commands - canonical representation
+///
+/// Internally stores commands as Vec<(Option<name>, command)> for uniform processing.
+/// Deserializes from three TOML formats:
+/// - Single string: `post-create-command = "npm install"`
+/// - Array: `post-create-command = ["npm install", "npm test"]`
+/// - Named table: `[post-create-command]` followed by `install = "npm install"`
+///
+/// This canonical form eliminates branching at call sites - code just iterates over commands.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommandConfig {
+    commands: Vec<(Option<String>, String)>,
+}
+
+impl CommandConfig {
+    /// Returns the commands as a slice
+    pub fn commands(&self) -> &[(Option<String>, String)] {
+        &self.commands
+    }
+}
+
+// Custom deserialization to handle 3 TOML formats
+impl<'de> Deserialize<'de> for CommandConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum CommandConfigToml {
+            Single(String),
+            Multiple(Vec<String>),
+            Named(std::collections::HashMap<String, String>),
+        }
+
+        let toml = CommandConfigToml::deserialize(deserializer)?;
+        let commands = match toml {
+            CommandConfigToml::Single(cmd) => vec![(None, cmd)],
+            CommandConfigToml::Multiple(cmds) => cmds
+                .into_iter()
+                .enumerate()
+                .map(|(i, cmd)| (Some((i + 1).to_string()), cmd))
+                .collect(),
+            CommandConfigToml::Named(map) => {
+                let mut pairs: Vec<_> = map.into_iter().collect();
+                pairs.sort_by(|a, b| a.0.cmp(&b.0));
+                pairs.into_iter().map(|(k, v)| (Some(k), v)).collect()
+            }
+        };
+        Ok(CommandConfig { commands })
+    }
+}
+
+// Serialize back to most appropriate format
+impl Serialize for CommandConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        // If single unnamed command, serialize as string
+        if self.commands.len() == 1 && self.commands[0].0.is_none() {
+            return self.commands[0].1.serialize(serializer);
+        }
+
+        // If all commands are unnamed or numbered 1,2,3..., serialize as array
+        let all_numbered = self
+            .commands
+            .iter()
+            .enumerate()
+            .all(|(i, (name, _))| name.as_ref().is_none_or(|n| n == &(i + 1).to_string()));
+
+        if all_numbered {
+            let cmds: Vec<_> = self.commands.iter().map(|(_, cmd)| cmd).collect();
+            return cmds.serialize(serializer);
+        }
+
+        // Otherwise serialize as named map
+        // At this point, all commands must have names (from Named TOML format)
+        let mut map = serializer.serialize_map(Some(self.commands.len()))?;
+        for (name, cmd) in &self.commands {
+            let key = name
+                .as_ref()
+                .expect("named format requires all commands to have names");
+            map.serialize_entry(key, cmd)?;
+        }
+        map.end()
+    }
 }
 
 /// Approved command for automatic execution
@@ -652,24 +731,24 @@ mod tests {
     fn test_command_config_single() {
         let toml = r#"post-create-command = "npm install""#;
         let config: ProjectConfig = toml::from_str(toml).unwrap();
-        assert!(matches!(
-            config.post_create_command,
-            Some(CommandConfig::Single(_))
-        ));
+        let cmd_config = config.post_create_command.unwrap();
+        let commands = cmd_config.commands();
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0], (None, "npm install".to_string()));
     }
 
     #[test]
     fn test_command_config_multiple() {
         let toml = r#"post-create-command = ["npm install", "npm test"]"#;
         let config: ProjectConfig = toml::from_str(toml).unwrap();
-        match config.post_create_command {
-            Some(CommandConfig::Multiple(cmds)) => {
-                assert_eq!(cmds.len(), 2);
-                assert_eq!(cmds[0], "npm install");
-                assert_eq!(cmds[1], "npm test");
-            }
-            _ => panic!("Expected Multiple variant"),
-        }
+        let cmd_config = config.post_create_command.unwrap();
+        let commands = cmd_config.commands();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(
+            commands[0],
+            (Some("1".to_string()), "npm install".to_string())
+        );
+        assert_eq!(commands[1], (Some("2".to_string()), "npm test".to_string()));
     }
 
     #[test]
@@ -680,14 +759,18 @@ mod tests {
             watch = "npm run watch"
         "#;
         let config: ProjectConfig = toml::from_str(toml).unwrap();
-        match config.post_start_command {
-            Some(CommandConfig::Named(cmds)) => {
-                assert_eq!(cmds.len(), 2);
-                assert_eq!(cmds.get("server"), Some(&"npm run dev".to_string()));
-                assert_eq!(cmds.get("watch"), Some(&"npm run watch".to_string()));
-            }
-            _ => panic!("Expected Named variant"),
-        }
+        let cmd_config = config.post_start_command.unwrap();
+        let commands = cmd_config.commands();
+        assert_eq!(commands.len(), 2);
+        // Names are sorted alphabetically
+        assert_eq!(
+            commands[0],
+            (Some("server".to_string()), "npm run dev".to_string())
+        );
+        assert_eq!(
+            commands[1],
+            (Some("watch".to_string()), "npm run watch".to_string())
+        );
     }
 
     #[test]
@@ -707,24 +790,27 @@ mod tests {
     fn test_pre_merge_command_single() {
         let toml = r#"pre-merge-command = "cargo test""#;
         let config: ProjectConfig = toml::from_str(toml).unwrap();
-        assert!(matches!(
-            config.pre_merge_command,
-            Some(CommandConfig::Single(_))
-        ));
+        let cmd_config = config.pre_merge_command.unwrap();
+        let commands = cmd_config.commands();
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0], (None, "cargo test".to_string()));
     }
 
     #[test]
     fn test_pre_merge_command_multiple() {
         let toml = r#"pre-merge-command = ["cargo fmt -- --check", "cargo test"]"#;
         let config: ProjectConfig = toml::from_str(toml).unwrap();
-        match config.pre_merge_command {
-            Some(CommandConfig::Multiple(cmds)) => {
-                assert_eq!(cmds.len(), 2);
-                assert_eq!(cmds[0], "cargo fmt -- --check");
-                assert_eq!(cmds[1], "cargo test");
-            }
-            _ => panic!("Expected Multiple variant"),
-        }
+        let cmd_config = config.pre_merge_command.unwrap();
+        let commands = cmd_config.commands();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(
+            commands[0],
+            (Some("1".to_string()), "cargo fmt -- --check".to_string())
+        );
+        assert_eq!(
+            commands[1],
+            (Some("2".to_string()), "cargo test".to_string())
+        );
     }
 
     #[test]
@@ -736,18 +822,64 @@ mod tests {
             test = "cargo test"
         "#;
         let config: ProjectConfig = toml::from_str(toml).unwrap();
-        match config.pre_merge_command {
-            Some(CommandConfig::Named(cmds)) => {
-                assert_eq!(cmds.len(), 3);
-                assert_eq!(
-                    cmds.get("format"),
-                    Some(&"cargo fmt -- --check".to_string())
-                );
-                assert_eq!(cmds.get("lint"), Some(&"cargo clippy".to_string()));
-                assert_eq!(cmds.get("test"), Some(&"cargo test".to_string()));
-            }
-            _ => panic!("Expected Named variant"),
-        }
+        let cmd_config = config.pre_merge_command.unwrap();
+        let commands = cmd_config.commands();
+        assert_eq!(commands.len(), 3);
+        // Names are sorted alphabetically
+        assert_eq!(
+            commands[0],
+            (
+                Some("format".to_string()),
+                "cargo fmt -- --check".to_string()
+            )
+        );
+        assert_eq!(
+            commands[1],
+            (Some("lint".to_string()), "cargo clippy".to_string())
+        );
+        assert_eq!(
+            commands[2],
+            (Some("test".to_string()), "cargo test".to_string())
+        );
+    }
+
+    #[test]
+    fn test_command_config_roundtrip_single() {
+        let original = r#"post-create-command = "npm install""#;
+        let config: ProjectConfig = toml::from_str(original).unwrap();
+        let serialized = toml::to_string(&config).unwrap();
+        let config2: ProjectConfig = toml::from_str(&serialized).unwrap();
+        assert_eq!(config, config2);
+        // Verify it serialized back as a string, not array
+        assert!(serialized.contains(r#"post-create-command = "npm install""#));
+    }
+
+    #[test]
+    fn test_command_config_roundtrip_multiple() {
+        let original = r#"post-create-command = ["npm install", "npm test"]"#;
+        let config: ProjectConfig = toml::from_str(original).unwrap();
+        let serialized = toml::to_string(&config).unwrap();
+        let config2: ProjectConfig = toml::from_str(&serialized).unwrap();
+        assert_eq!(config, config2);
+        // Verify it serialized back as an array
+        assert!(serialized.contains(r#"post-create-command = ["npm install", "npm test"]"#));
+    }
+
+    #[test]
+    fn test_command_config_roundtrip_named() {
+        let original = r#"
+            [post-start-command]
+            server = "npm run dev"
+            watch = "npm run watch"
+        "#;
+        let config: ProjectConfig = toml::from_str(original).unwrap();
+        let serialized = toml::to_string(&config).unwrap();
+        let config2: ProjectConfig = toml::from_str(&serialized).unwrap();
+        assert_eq!(config, config2);
+        // Verify it serialized back as a named table
+        assert!(serialized.contains("[post-start-command]"));
+        assert!(serialized.contains(r#"server = "npm run dev""#));
+        assert!(serialized.contains(r#"watch = "npm run watch""#));
     }
 
     #[test]

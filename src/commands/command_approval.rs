@@ -2,36 +2,11 @@
 //!
 //! Shared helpers for approving commands declared in project configuration.
 
-use worktrunk::config::{ApprovedCommand, CommandConfig, WorktrunkConfig};
+use worktrunk::config::{ApprovedCommand, WorktrunkConfig};
 use worktrunk::git::{GitError, GitResultExt};
 use worktrunk::styling::{
     AnstyleStyle, HINT_EMOJI, WARNING, WARNING_EMOJI, eprint, eprintln, format_bash_with_gutter,
 };
-
-/// Convert CommandConfig to a vector of `(name, command)` pairs.
-///
-/// Naming rules:
-/// - Single string → None (unnamed)
-/// - Array → numbered 1-based (`"1"`, `"2"`, …)
-/// - Table → uses the map keys (sorted for determinism)
-pub fn command_config_to_vec(config: &CommandConfig) -> Vec<(Option<String>, String)> {
-    match config {
-        CommandConfig::Single(cmd) => vec![(None, cmd.clone())],
-        CommandConfig::Multiple(cmds) => cmds
-            .iter()
-            .enumerate()
-            .map(|(i, cmd)| (Some((i + 1).to_string()), cmd.clone()))
-            .collect(),
-        CommandConfig::Named(map) => {
-            let mut pairs: Vec<_> = map
-                .iter()
-                .map(|(k, v)| (Some(k.clone()), v.clone()))
-                .collect();
-            pairs.sort_by(|a, b| a.0.cmp(&b.0));
-            pairs
-        }
-    }
-}
 
 /// Batch approval helper used when multiple commands are queued for execution.
 /// Returns `Ok(true)` when execution may continue, `Ok(false)` when the user
@@ -126,46 +101,4 @@ fn prompt_for_batch_approval(
     let mut response = String::new();
     io::stdin().read_line(&mut response)?;
     Ok(response.trim().eq_ignore_ascii_case("y"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    #[test]
-    fn test_command_config_to_vec_single() {
-        let config = CommandConfig::Single("echo test".to_string());
-        let result = command_config_to_vec(&config);
-        assert_eq!(result, vec![(None, "echo test".to_string())]);
-    }
-
-    #[test]
-    fn test_command_config_to_vec_multiple() {
-        let config = CommandConfig::Multiple(vec!["cmd1".to_string(), "cmd2".to_string()]);
-        let result = command_config_to_vec(&config);
-        assert_eq!(
-            result,
-            vec![
-                (Some("1".to_string()), "cmd1".to_string()),
-                (Some("2".to_string()), "cmd2".to_string())
-            ]
-        );
-    }
-
-    #[test]
-    fn test_command_config_to_vec_named() {
-        let mut map = HashMap::new();
-        map.insert("zebra".to_string(), "z".to_string());
-        map.insert("alpha".to_string(), "a".to_string());
-        let config = CommandConfig::Named(map);
-        let result = command_config_to_vec(&config);
-        assert_eq!(
-            result,
-            vec![
-                (Some("alpha".to_string()), "a".to_string()),
-                (Some("zebra".to_string()), "z".to_string())
-            ]
-        );
-    }
 }
