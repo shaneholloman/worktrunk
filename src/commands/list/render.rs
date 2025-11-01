@@ -426,13 +426,6 @@ pub fn format_list_item_line(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::list::layout::{ColumnWidths, LayoutConfig};
-    use crate::commands::list::model::{
-        AheadBehind, BranchDiffTotals, CommitDetails, UpstreamStatus, WorktreeInfo,
-    };
-    use crate::display::shorten_path;
-    use std::path::PathBuf;
-    use worktrunk::styling::StyledLine;
 
     #[test]
     fn test_format_diff_column_pads_to_total_width() {
