@@ -14,8 +14,8 @@ mod output;
 use commands::{
     ConfigAction, Shell, handle_complete, handle_completion, handle_config_help,
     handle_config_init, handle_config_list, handle_config_refresh_cache, handle_configure_shell,
-    handle_dev_run_hook, handle_init, handle_list, handle_merge, handle_push, handle_remove,
-    handle_switch,
+    handle_dev_commit, handle_dev_push, handle_dev_rebase, handle_dev_run_hook, handle_dev_squash,
+    handle_init, handle_list, handle_merge, handle_push, handle_remove, handle_switch,
 };
 use output::{handle_remove_output, handle_switch_output};
 
@@ -77,6 +77,47 @@ enum DevCommand {
         /// Skip command approval prompts
         #[arg(short, long)]
         force: bool,
+    },
+
+    /// Commit changes with LLM-generated message
+    Commit {
+        /// Skip command approval prompts
+        #[arg(short, long)]
+        force: bool,
+
+        /// Skip all project hooks (pre-commit-command)
+        #[arg(long)]
+        no_hooks: bool,
+    },
+
+    /// Squash commits with LLM-generated message
+    Squash {
+        /// Target branch to squash against (defaults to default branch)
+        target: Option<String>,
+
+        /// Skip command approval prompts
+        #[arg(short, long)]
+        force: bool,
+
+        /// Skip all project hooks (pre-squash-command)
+        #[arg(long)]
+        no_hooks: bool,
+    },
+
+    /// Push changes to target branch
+    Push {
+        /// Target branch (defaults to default branch)
+        target: Option<String>,
+
+        /// Allow pushing merge commits (non-linear history)
+        #[arg(long)]
+        allow_merge_commits: bool,
+    },
+
+    /// Rebase current branch onto target branch
+    Rebase {
+        /// Target branch to rebase onto (defaults to default branch)
+        target: Option<String>,
     },
 }
 
@@ -393,6 +434,17 @@ fn main() {
         },
         Commands::Dev { action } => match action {
             DevCommand::RunHook { hook_type, force } => handle_dev_run_hook(hook_type, force),
+            DevCommand::Commit { force, no_hooks } => handle_dev_commit(force, no_hooks),
+            DevCommand::Squash {
+                target,
+                force,
+                no_hooks,
+            } => handle_dev_squash(target.as_deref(), force, no_hooks),
+            DevCommand::Push {
+                target,
+                allow_merge_commits,
+            } => handle_dev_push(target.as_deref(), allow_merge_commits),
+            DevCommand::Rebase { target } => handle_dev_rebase(target.as_deref()),
         },
         Commands::List {
             format,

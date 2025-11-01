@@ -10,6 +10,7 @@ Command failed with exit code: exit status: 1
 
 💡 [2mUse --no-hooks to skip pre-merge commands[0m
 🔄 [36mRebasing onto [0m[1m[36mmain[0m[36m...[0m
+✅ [32mRebased onto [1m[32mmain[0m[0m
 🔄 [36mRunning pre-merge: [1mformat[0m[0m
 [40m [0m [1m[34mecho [32m'✓ Code formatting check passed'
 

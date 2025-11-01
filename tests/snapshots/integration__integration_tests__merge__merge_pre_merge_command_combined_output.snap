@@ -5,6 +5,7 @@ expression: output
 Exit code: 0
 💡 [2mOnly 1 commit since [0m[1m[36mmain[0m[2m - no squashing needed[0m
 🔄 [36mRebasing onto [0m[1m[36mmain[0m[36m...[0m
+✅ [32mRebased onto [1m[32mmain[0m[0m
 🔄 [36mRunning pre-merge: [1mfirst[0m[0m
 [40m [0m [1m[34mecho [32m'STDOUT-FROM-FIRST' [36m&& [1m[34mecho [32m'STDERR-FROM-FIRST' >&2
 

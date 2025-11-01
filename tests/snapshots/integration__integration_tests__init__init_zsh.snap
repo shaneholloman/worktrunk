@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpwPTuOe/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpVE3LFA/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -251,6 +251,48 @@ _arguments "${_arguments_options[@]}" : \
 ':hook_type -- Hook type to run:(post-create post-start pre-commit pre-squash pre-merge post-merge)' \
 && ret=0
 ;;
+(commit)
+_arguments "${_arguments_options[@]}" : \
+'-f[Skip command approval prompts]' \
+'--force[Skip command approval prompts]' \
+'--no-hooks[Skip all project hooks (pre-commit-command)]' \
+'-v[Enable verbose output (show git commands and debug info)]' \
+'--verbose[Enable verbose output (show git commands and debug info)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(squash)
+_arguments "${_arguments_options[@]}" : \
+'-f[Skip command approval prompts]' \
+'--force[Skip command approval prompts]' \
+'--no-hooks[Skip all project hooks (pre-squash-command)]' \
+'-v[Enable verbose output (show git commands and debug info)]' \
+'--verbose[Enable verbose output (show git commands and debug info)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'::target -- Target branch to squash against (defaults to default branch):_default' \
+&& ret=0
+;;
+(push)
+_arguments "${_arguments_options[@]}" : \
+'--allow-merge-commits[Allow pushing merge commits (non-linear history)]' \
+'-v[Enable verbose output (show git commands and debug info)]' \
+'--verbose[Enable verbose output (show git commands and debug info)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'::target -- Target branch (defaults to default branch):_default' \
+&& ret=0
+;;
+(rebase)
+_arguments "${_arguments_options[@]}" : \
+'-v[Enable verbose output (show git commands and debug info)]' \
+'--verbose[Enable verbose output (show git commands and debug info)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'::target -- Target branch to rebase onto (defaults to default branch):_default' \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -410,13 +452,37 @@ _wt__config__shell_commands() {
 _wt__dev_commands() {
     local commands; commands=(
 'run-hook:Run a project hook for testing' \
+'commit:Commit changes with LLM-generated message' \
+'squash:Squash commits with LLM-generated message' \
+'push:Push changes to target branch' \
+'rebase:Rebase current branch onto target branch' \
     )
     _describe -t commands 'wt dev commands' commands "$@"
+}
+(( $+functions[_wt__dev__commit_commands] )) ||
+_wt__dev__commit_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt dev commit commands' commands "$@"
+}
+(( $+functions[_wt__dev__push_commands] )) ||
+_wt__dev__push_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt dev push commands' commands "$@"
+}
+(( $+functions[_wt__dev__rebase_commands] )) ||
+_wt__dev__rebase_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt dev rebase commands' commands "$@"
 }
 (( $+functions[_wt__dev__run-hook_commands] )) ||
 _wt__dev__run-hook_commands() {
     local commands; commands=()
     _describe -t commands 'wt dev run-hook commands' commands "$@"
+}
+(( $+functions[_wt__dev__squash_commands] )) ||
+_wt__dev__squash_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt dev squash commands' commands "$@"
 }
 (( $+functions[_wt__init_commands] )) ||
 _wt__init_commands() {

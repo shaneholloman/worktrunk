@@ -104,46 +104,11 @@ pub fn handle_merge(
 
     // Squash commits if enabled
     if squash_enabled {
-        handle_squash(
-            &target_branch,
-            &config.commit_generation,
-            &current_branch,
-            no_hooks,
-            force,
-        )?;
+        handle_squash(&target_branch, no_hooks, force)?;
     }
 
-    // Rebase onto target
-    crate::output::progress(format!(
-        "🔄 {CYAN}Rebasing onto {CYAN:#}{CYAN_BOLD}{target_branch}{CYAN_BOLD:#}{CYAN}...{CYAN:#}"
-    ))?;
-
-    let rebase_result = repo.run_command(&["rebase", &target_branch]);
-
-    // If rebase failed, check if it's due to conflicts
-    if let Err(e) = rebase_result {
-        if let Some(state) = repo.worktree_state()?
-            && state.starts_with("REBASING")
-        {
-            return Err(GitError::RebaseConflict {
-                state,
-                target_branch: target_branch.to_string(),
-            });
-        }
-        // Not a rebase conflict, return original error
-        return Err(GitError::CommandFailed(format!(
-            "Failed to rebase onto '{}': {}",
-            target_branch, e
-        )));
-    }
-
-    // Verify rebase completed successfully (safety check for edge cases)
-    if let Some(state) = repo.worktree_state()? {
-        return Err(GitError::RebaseConflict {
-            state,
-            target_branch: target_branch.to_string(),
-        });
-    }
+    // Rebase onto target (delegate to atomic dev command)
+    super::dev::handle_dev_rebase(Some(&target_branch))?;
 
     // Run pre-merge checks unless --no-hooks was specified
     // Do this AFTER rebase to validate the final state that will be pushed
@@ -247,7 +212,7 @@ fn handle_merge_summary_output(primary_path: Option<&std::path::Path>) -> Result
 }
 
 /// Format a commit message with the first line in bold, ready for gutter display
-fn format_commit_message_for_display(message: &str) -> String {
+pub fn format_commit_message_for_display(message: &str) -> String {
     let bold = AnstyleStyle::new().bold();
     let lines: Vec<&str> = message.lines().collect();
 
@@ -270,7 +235,7 @@ fn format_commit_message_for_display(message: &str) -> String {
 }
 
 /// Show hint if no LLM command is configured
-fn show_llm_config_hint_if_needed(
+pub fn show_llm_config_hint_if_needed(
     commit_generation_config: &worktrunk::config::CommitGenerationConfig,
 ) -> Result<(), GitError> {
     // Check if LLM is NOT configured (matching llm.rs logic)
@@ -289,7 +254,7 @@ fn show_llm_config_hint_if_needed(
 }
 
 /// Commit already-staged changes with an LLM-generated message
-fn commit_with_generated_message(
+pub fn commit_with_generated_message(
     progress_msg: &str,
     commit_generation_config: &worktrunk::config::CommitGenerationConfig,
 ) -> Result<(), GitError> {
@@ -383,141 +348,12 @@ fn handle_commit_changes(
 
 fn handle_squash(
     target_branch: &str,
-    commit_generation_config: &worktrunk::config::CommitGenerationConfig,
-    current_branch: &str,
     no_hooks: bool,
     force: bool,
 ) -> Result<Option<usize>, GitError> {
-    let repo = Repository::current();
-    let config = WorktrunkConfig::load().git_context("Failed to load config")?;
-
-    // Run pre-squash hook unless --no-hooks was specified
-    if !no_hooks && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
-        let worktree_path =
-            std::env::current_dir().git_context("Failed to get current directory")?;
-        run_pre_squash_commands(
-            &project_config,
-            current_branch,
-            target_branch,
-            &worktree_path,
-            &repo,
-            &config,
-            force,
-        )?;
-    }
-
-    // Get merge base with target branch
-    let merge_base = repo.merge_base("HEAD", target_branch)?;
-
-    // Count commits since merge base
-    let commit_count = repo.count_commits(&merge_base, "HEAD")?;
-
-    // Check if there are staged changes
-    let has_staged = repo.has_staged_changes()?;
-
-    // Handle different scenarios
-    if commit_count == 0 && !has_staged {
-        // No commits and no staged changes - nothing to squash
-        let dim = AnstyleStyle::new().dimmed();
-        crate::output::progress(format!(
-            "{dim}No commits to squash - already at merge base{dim:#}"
-        ))?;
-        return Ok(None);
-    }
-
-    if commit_count == 0 && has_staged {
-        // Just staged changes, no commits - commit them directly (no squashing needed)
-        commit_with_generated_message("Committing changes...", commit_generation_config)?;
-        return Ok(None);
-    }
-
-    if commit_count == 1 && !has_staged {
-        // Single commit, no staged changes - nothing to do
-        crate::output::hint(format!(
-            "{HINT_EMOJI} {HINT}Only 1 commit since {HINT:#}{CYAN_BOLD}{target_branch}{CYAN_BOLD:#}{HINT} - no squashing needed{HINT:#}"
-        ))?;
-        return Ok(None);
-    }
-
-    // Either multiple commits OR single commit with staged changes - squash them
-    // Get diff stats early for display in progress message
-    let range = format!("{}..HEAD", merge_base);
-    let diff_shortstat = repo
-        .run_command(&["diff", "--shortstat", &range])
-        .unwrap_or_default();
-    let stats = parse_diff_shortstat(&diff_shortstat);
-    let stats_parts = stats.format_summary();
-
-    let squash_progress = match stats_parts.is_empty() {
-        true => format!("🔄 {CYAN}Squashing {commit_count} commits into 1...{CYAN:#}"),
-        false => format!(
-            "🔄 {CYAN}Squashing {commit_count} commits into 1{CYAN:#} ({})...",
-            stats_parts.join(", ")
-        ),
-    };
-    crate::output::progress(squash_progress)?;
-
-    // Get commit subjects for the squash message
-    let subjects = repo.commit_subjects(&range)?;
-
-    // Generate squash commit message
-    crate::output::progress(format!(
-        "🔄 {CYAN}Generating squash commit message...{CYAN:#}"
-    ))?;
-
-    show_llm_config_hint_if_needed(commit_generation_config)?;
-
-    // Get current branch and repo name for template variables
-    let current_branch = repo.current_branch()?.unwrap_or_else(|| "HEAD".to_string());
-    let repo_root = repo.worktree_root()?;
-    let repo_name = repo_root
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("repo");
-
-    let commit_message = crate::llm::generate_squash_message(
-        target_branch,
-        &subjects,
-        &current_branch,
-        repo_name,
-        commit_generation_config,
-    )
-    .git_context("Failed to generate commit message")?;
-
-    // Display the generated commit message
-    let formatted_message = format_commit_message_for_display(&commit_message);
-    crate::output::progress(format_with_gutter(&formatted_message, "", None))?;
-
-    // Reset to merge base (soft reset stages all changes, including any already-staged uncommitted changes)
-    repo.run_command(&["reset", "--soft", &merge_base])
-        .git_context("Failed to reset to merge base")?;
-
-    // Check if there are actually any changes to commit
-    // This can happen if all commits result in no net changes (e.g., series of changes and reverts)
-    if !repo.has_staged_changes()? {
-        use worktrunk::styling::{ERROR, ERROR_EMOJI, HINT, HINT_EMOJI};
-        return Err(GitError::CommandFailed(format!(
-            "{ERROR_EMOJI} {ERROR}No changes to commit after squashing {commit_count} commits{ERROR:#}\n\n{HINT_EMOJI} {HINT}The commits resulted in no net changes (e.g., changes were reverted or already in {HINT:#}{CYAN_BOLD}{target_branch}{CYAN_BOLD:#}{HINT}){HINT:#}"
-        )));
-    }
-
-    // Commit with the generated message
-    repo.run_command(&["commit", "-m", &commit_message])
-        .git_context("Failed to create squash commit")?;
-
-    // Get commit hash for display
-    let commit_hash = repo
-        .run_command(&["rev-parse", "--short", "HEAD"])?
-        .trim()
-        .to_string();
-
-    // Show success immediately after completing the squash
-    use worktrunk::styling::{GREEN, HINT, SUCCESS_EMOJI};
-    crate::output::success(format!(
-        "{SUCCESS_EMOJI} {GREEN}Squashed {commit_count} commits into 1{GREEN:#} @ {HINT}{commit_hash}{HINT:#}"
-    ))?;
-
-    Ok(Some(commit_count))
+    // Delegate to the atomic dev command
+    super::dev::handle_dev_squash(Some(target_branch), force, no_hooks)?;
+    Ok(None)
 }
 
 /// Run pre-merge commands sequentially (blocking, fail-fast)

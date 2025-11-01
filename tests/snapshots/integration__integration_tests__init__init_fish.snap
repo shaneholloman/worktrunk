@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpj1imH2/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpIAOMmN/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -169,6 +169,9 @@ if type -q wt; or set -q WORKTRUNK_BIN
     # Register dynamic completions
     complete -c wt -n '__fish_seen_subcommand_from init' -f -a '(__wt_complete)' -d 'Shell to generate code for'
     complete -c wt -n '__fish_seen_subcommand_from dev; and __fish_seen_subcommand_from run-hook' -f -a '(__wt_complete)' -d 'Hook type to run'
+    complete -c wt -n '__fish_seen_subcommand_from dev; and __fish_seen_subcommand_from squash' -f -a '(__wt_complete)' -d 'Target branch to squash against (defaults to default branch)'
+    complete -c wt -n '__fish_seen_subcommand_from dev; and __fish_seen_subcommand_from push' -f -a '(__wt_complete)' -d 'Target branch (defaults to default branch)'
+    complete -c wt -n '__fish_seen_subcommand_from dev; and __fish_seen_subcommand_from rebase' -f -a '(__wt_complete)' -d 'Target branch to rebase onto (defaults to default branch)'
     complete -c wt -n '__fish_seen_subcommand_from switch' -f -a '(__wt_complete)' -d 'Branch name or worktree path'
     complete -c wt -n '__fish_seen_subcommand_from remove' -f -a '(__wt_complete)' -d 'Worktree names or branches to remove (defaults to current worktree if none specified)'
     complete -c wt -n '__fish_seen_subcommand_from push' -f -a '(__wt_complete)' -d 'Target branch (defaults to default branch)'
@@ -243,12 +246,29 @@ zsh\t''"
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from shell" -s f -l force -d 'Skip confirmation prompt'
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from shell" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from shell" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
-complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook" -f -a "run-hook" -d 'Run a project hook for testing'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -f -a "run-hook" -d 'Run a project hook for testing'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -f -a "commit" -d 'Commit changes with LLM-generated message'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -f -a "squash" -d 'Squash commits with LLM-generated message'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -f -a "push" -d 'Push changes to target branch'
+complete -c wt -n "__fish_wt_using_subcommand dev; and not __fish_seen_subcommand_from run-hook commit squash push rebase" -f -a "rebase" -d 'Rebase current branch onto target branch'
 complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from run-hook" -s f -l force -d 'Skip command approval prompts'
 complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from run-hook" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
 complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from run-hook" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from commit" -s f -l force -d 'Skip command approval prompts'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from commit" -l no-hooks -d 'Skip all project hooks (pre-commit-command)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from commit" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from commit" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from squash" -s f -l force -d 'Skip command approval prompts'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from squash" -l no-hooks -d 'Skip all project hooks (pre-squash-command)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from squash" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from squash" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from push" -l allow-merge-commits -d 'Allow pushing merge commits (non-linear history)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from push" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from push" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from rebase" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
+complete -c wt -n "__fish_wt_using_subcommand dev; and __fish_seen_subcommand_from rebase" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand list" -l format -d 'Output format' -r -f -a "table\t'Human-readable table format'
 json\t'JSON format with colored unicode display fields'"
 complete -c wt -n "__fish_wt_using_subcommand list" -l branches -d 'Also display branches that don\'t have worktrees'

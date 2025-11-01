@@ -19,7 +19,7 @@ info:
     WORKTRUNK_COMMIT_GENERATION__ARGS__0: "-c"
     WORKTRUNK_COMMIT_GENERATION__ARGS__1: "cat >/dev/null && echo 'feat: implement user authentication system'"
     WORKTRUNK_COMMIT_GENERATION__COMMAND: sh
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpUHqZqc/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpkJlhWQ/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -35,6 +35,7 @@ exit_code: 0
 
 ✅ [32mSquashed 2 commits into 1[0m @ [SHA]
 🔄 [36mRebasing onto [0m[1m[36mmain[0m[36m...[0m
+✅ [32mRebased onto [1m[32mmain[0m[0m
 🔄 [36mMerging 1 commit to [1m[36mmain[0m[0m @ [SHA]
 
 * [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Squash commits from main

@@ -17,13 +17,14 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpnUhwLD/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp1GXQ92/test-config.toml
 ---
 success: false
 exit_code: 1
 ----- stdout -----
 💡 [2mOnly 1 commit since [0m[1m[36mmain[0m[2m - no squashing needed[0m
 🔄 [36mRebasing onto [0m[1m[36mmain[0m[36m...[0m
+✅ [32mRebased onto [1m[32mmain[0m[0m
 🔄 [36mRunning pre-merge:[0m
 [40m [0m [1m[34mexit 1
 
