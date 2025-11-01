@@ -403,11 +403,11 @@ fn test_merge_squash_deterministic() {
         .output()
         .expect("Failed to commit");
 
-    // Merge with squash (no LLM configured - should use deterministic message)
+    // Merge (squashing is now the default - no LLM configured, should use deterministic message)
     snapshot_merge(
         "merge_squash_deterministic",
         &repo,
-        &["main", "--squash"],
+        &["main"],
         Some(&feature_wt),
     );
 }
@@ -461,10 +461,11 @@ fn test_merge_squash_with_llm() {
 
     // Configure mock LLM command via environment variable
     // Use sh to consume stdin and return a fixed message
+    // (squashing is now the default, no need for --squash flag)
     snapshot_merge_with_env(
         "merge_squash_with_llm",
         &repo,
-        &["main", "--squash"],
+        &["main"],
         Some(&feature_wt),
         &[
             ("WORKTRUNK_COMMIT_GENERATION__COMMAND", "sh"),
@@ -525,10 +526,11 @@ fn test_merge_squash_llm_fallback() {
 
     // Configure LLM command that will fail (non-existent command)
     // Should now error instead of falling back
+    // (squashing is now the default, no need for --squash flag)
     snapshot_merge_with_env(
         "merge_squash_llm_fallback",
         &repo,
-        &["main", "--squash"],
+        &["main"],
         Some(&feature_wt),
         &[(
             "WORKTRUNK_COMMIT_GENERATION__COMMAND",
@@ -569,11 +571,66 @@ fn test_merge_squash_single_commit() {
         .output()
         .expect("Failed to commit");
 
-    // Merge with squash - should skip squashing since there's only one commit
+    // Merge (squashing is default) - should skip squashing since there's only one commit
     snapshot_merge(
         "merge_squash_single_commit",
         &repo,
-        &["main", "--squash"],
+        &["main"],
+        Some(&feature_wt),
+    );
+}
+
+#[test]
+fn test_merge_no_squash() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a worktree for main
+    let main_wt = repo.root_path().parent().unwrap().join("test-repo.main-wt");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["worktree", "add", main_wt.to_str().unwrap(), "main"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to add worktree");
+
+    // Create a feature worktree and make multiple commits
+    let feature_wt = repo.add_worktree("feature", "feature");
+
+    std::fs::write(feature_wt.join("file1.txt"), "content 1").expect("Failed to write file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "file1.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "feat: add file 1"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    std::fs::write(feature_wt.join("file2.txt"), "content 2").expect("Failed to write file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "file2.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "feat: add file 2"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Merge with --no-squash - should NOT squash the commits
+    snapshot_merge(
+        "merge_no_squash",
+        &repo,
+        &["main", "--no-squash"],
         Some(&feature_wt),
     );
 }
@@ -645,11 +702,11 @@ fn test_merge_squash_empty_changes() {
         .output()
         .expect("Failed to commit");
 
-    // Merge with squash - should fail with helpful error about no net changes
+    // Merge (squashing is default) - should fail with helpful error about no net changes
     snapshot_merge(
         "merge_squash_empty_changes",
         &repo,
-        &["main", "--squash"],
+        &["main"],
         Some(&feature_wt),
     );
 }
@@ -806,11 +863,11 @@ fn test_merge_auto_commit_and_squash() {
     std::fs::write(feature_wt.join("file1.txt"), "updated content 1")
         .expect("Failed to write file");
 
-    // Merge with --squash - should stage uncommitted changes, then squash all commits including the staged changes
+    // Merge (squashing is default) - should stage uncommitted changes, then squash all commits including the staged changes
     snapshot_merge_with_env(
         "merge_auto_commit_and_squash",
         &repo,
-        &["main", "--squash"],
+        &["main"],
         Some(&feature_wt),
         &[
             ("WORKTRUNK_COMMIT_GENERATION__COMMAND", "echo"),
@@ -1481,11 +1538,11 @@ fn test_merge_pre_squash_command_success() {
         .output()
         .expect("Failed to commit");
 
-    // Merge with --squash and --force
+    // Merge with --force (squashing is now the default)
     snapshot_merge(
         "merge_pre_squash_command_success",
         &repo,
-        &["main", "--squash", "--force"],
+        &["main", "--force"],
         Some(&feature_wt),
     );
 }
@@ -1534,11 +1591,11 @@ fn test_merge_pre_squash_command_failure() {
         .output()
         .expect("Failed to commit");
 
-    // Merge with --squash and --force - pre-squash command should fail and block merge
+    // Merge with --force (squashing is default) - pre-squash command should fail and block merge
     snapshot_merge(
         "merge_pre_squash_command_failure",
         &repo,
-        &["main", "--squash", "--force"],
+        &["main", "--force"],
         Some(&feature_wt),
     );
 }

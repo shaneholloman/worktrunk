@@ -13,21 +13,32 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
+    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpxdVWsm/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpB1r44t/test-config.toml
 ---
-success: false
-exit_code: 1
+success: true
+exit_code: 0
 ----- stdout -----
-🔄 [36mRunning pre-commit:[0m
-[40m [0m [1m[34mexit 1
+🔄 [36mCommitting changes...[0m (1 file, [32m+1[0m)
+🔄 [36mGenerating commit message...[0m
+💡 [2mUsing fallback commit message. Run 'wt config help' to configure LLM-generated messages[0m
+[40m [0m [1mWIP: Auto-commit before merge[0m
 
+✅ [32mCommitted changes[0m @ [SHA]
+🔄 [36mRebasing onto [0m[1m[36mmain[0m[36m...[0m
+🔄 [36mMerging 1 commit to [1m[36mmain[0m[0m @ [SHA]
+
+* [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m WIP: Auto-commit before merge
+
+ feature.txt | 1 [32m+[m
+ 1 file changed, 1 insertion(+)
+
+✅ [32mMerged to [1m[32mmain[0m (1 commit, 1 file, [32m+1[0m)  [0m
+🔄 [36mCleaning up worktree...[0m
+
+✅ [32mReturned to primary at [2m[REPO][0m[0m
 
 ----- stderr -----
-[0m❌ [31mPre-commit command failed[0m
-
-Command failed with exit code: exit status: 1
-
-💡 [2mUse --no-hooks to skip pre-commit commands[0m

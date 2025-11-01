@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpldTCOx/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpsmlUHy/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -402,7 +402,7 @@ _wt() {
             return 0
             ;;
         wt__merge)
-            opts="-s -k -f -v -h --squash --keep --no-hooks --force --verbose --help [TARGET]"
+            opts="-k -f -v -h --no-squash --keep --no-hooks --force --verbose --help [TARGET]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

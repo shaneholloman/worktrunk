@@ -5,7 +5,6 @@ info:
   args:
     - merge
     - main
-    - "--squash"
   env:
     CLICOLOR_FORCE: "1"
     COLUMNS: "150"
@@ -18,7 +17,7 @@ info:
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
     WORKTRUNK_COMMIT_GENERATION__COMMAND: nonexistent-llm-command
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp4DeuiX/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpRD0zND/test-config.toml
 ---
 success: true
 exit_code: 0

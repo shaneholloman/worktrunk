@@ -5,7 +5,6 @@ info:
   args:
     - merge
     - main
-    - "--squash"
   env:
     CLICOLOR_FORCE: "1"
     COLUMNS: "150"
@@ -19,7 +18,7 @@ info:
     SOURCE_DATE_EPOCH: "1761609600"
     WORKTRUNK_COMMIT_GENERATION__ARGS: "fix: update file 1 content"
     WORKTRUNK_COMMIT_GENERATION__COMMAND: echo
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpUIJO3O/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpSm7dqz/test-config.toml
 ---
 success: true
 exit_code: 0

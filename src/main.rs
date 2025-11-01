@@ -1,5 +1,5 @@
 use anstyle::Style;
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, CommandFactory, Parser, Subcommand, ValueEnum};
 use std::process;
 use worktrunk::config::WorktrunkConfig;
 use worktrunk::git::{GitError, GitResultExt, Repository};
@@ -207,9 +207,10 @@ The merge operation follows a strict order designed for fail-fast execution:
    If working tree has uncommitted changes, stages all changes (git add -A) and commits
    with LLM-generated message.
 
-4. Squash commits
-   If --squash specified, counts commits since merge base with target branch. When
-   multiple commits exist, squashes them into one with LLM-generated message.
+4. Squash commits (default)
+   By default, counts commits since merge base with target branch. When multiple
+   commits exist, squashes them into one with LLM-generated message. Skip squashing
+   with --no-squash.
 
 5. Rebase onto target
    Rebases current branch onto target branch. Detects conflicts and aborts if found.
@@ -227,8 +228,8 @@ EXAMPLES
 Basic merge to main:
   wt merge
 
-Squash commits before merging:
-  wt merge --squash
+Merge without squashing:
+  wt merge --no-squash
 
 Keep worktree after merging:
   wt merge --keep
@@ -239,9 +240,9 @@ Skip pre-merge commands:
         /// Target branch to merge into (defaults to default branch)
         target: Option<String>,
 
-        /// Squash all commits into one before merging
-        #[arg(short, long)]
-        squash: bool,
+        /// Disable squashing commits (by default, commits are squashed into one before merging)
+        #[arg(long = "no-squash", action = ArgAction::SetFalse, default_value_t = true)]
+        squash_enabled: bool,
 
         /// Keep worktree after merging (don't remove)
         #[arg(short, long)]
@@ -504,11 +505,11 @@ fn main() {
         } => handle_push(target.as_deref(), allow_merge_commits, "Pushed to"),
         Commands::Merge {
             target,
-            squash,
+            squash_enabled,
             keep,
             no_hooks,
             force,
-        } => handle_merge(target.as_deref(), squash, keep, no_hooks, force),
+        } => handle_merge(target.as_deref(), squash_enabled, keep, no_hooks, force),
         Commands::Completion { shell } => {
             let mut cli_cmd = Cli::command();
             handle_completion(shell, &mut cli_cmd);

@@ -10,7 +10,7 @@ use crate::output::execute_command_in_worktree;
 
 pub fn handle_merge(
     target: Option<&str>,
-    squash: bool,
+    squash_enabled: bool,
     keep: bool,
     no_hooks: bool,
     force: bool,
@@ -38,7 +38,7 @@ pub fn handle_merge(
 
     // Handle uncommitted changes depending on whether we're squashing
     if repo.is_dirty()? {
-        if squash {
+        if squash_enabled {
             // Just stage - squash will handle committing
             repo.run_command(&["add", "-A"])
                 .git_context("Failed to stage changes")?;
@@ -48,8 +48,8 @@ pub fn handle_merge(
         }
     }
 
-    // Squash commits if requested
-    if squash {
+    // Squash commits if enabled
+    if squash_enabled {
         handle_squash(
             &target_branch,
             &config.commit_generation,
