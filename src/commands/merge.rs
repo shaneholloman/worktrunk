@@ -115,10 +115,14 @@ pub fn handle_merge(
 
     // Finish worktree unless --keep was specified
     if !keep {
-        // STEP 1: Emit CD directive (just sets intent, doesn't actually change CWD)
+        // STEP 1: Check for uncommitted changes before attempting cleanup
+        // This prevents showing "Cleaning up worktree..." before failing
+        repo.ensure_clean_working_tree()?;
+
+        // STEP 2: Emit CD directive (just sets intent, doesn't actually change CWD)
         crate::output::change_directory(&primary_worktree_dir)?;
 
-        // STEP 2: Switch to target branch in primary worktree (fails safely if there's an issue)
+        // STEP 3: Switch to target branch in primary worktree (fails safely if there's an issue)
         let primary_repo = Repository::at(&primary_worktree_dir);
         let new_branch = primary_repo.current_branch()?;
         if new_branch.as_deref() != Some(&target_branch) {
@@ -130,7 +134,7 @@ pub fn handle_merge(
                 .git_context(&format!("Failed to switch to '{}'", target_branch))?;
         }
 
-        // STEP 3: Only NOW remove the worktree (after everything else succeeded)
+        // STEP 4: Only NOW remove the worktree (after all checks passed)
         crate::output::progress(format!("🔄 {CYAN}Cleaning up worktree...{CYAN:#}"))?;
         handle_remove(None)?;
 
