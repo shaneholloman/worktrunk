@@ -2,7 +2,7 @@ use worktrunk::HookType;
 use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, GitResultExt, Repository};
 use worktrunk::styling::{
-    AnstyleStyle, CYAN, CYAN_BOLD, HINT, HINT_EMOJI, WARNING, WARNING_EMOJI,
+    AnstyleStyle, CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, HINT, HINT_EMOJI, WARNING, WARNING_EMOJI,
     format_bash_with_gutter, format_with_gutter,
 };
 
@@ -49,6 +49,7 @@ fn show_untracked_warning(repo: &Repository) -> Result<(), GitError> {
 pub fn handle_merge(
     target: Option<&str>,
     squash_enabled: bool,
+    no_commit: bool,
     no_remove: bool,
     no_verify: bool,
     force: bool,
@@ -58,6 +59,21 @@ pub fn handle_merge(
 
     // Get current branch
     let current_branch = repo.current_branch()?.ok_or(GitError::DetachedHead)?;
+
+    // Validate --no-commit: requires clean working tree
+    if no_commit && repo.is_dirty()? {
+        return Err(GitError::UncommittedChanges);
+    }
+
+    // Validate --no-commit flag compatibility
+    if no_commit && !no_remove {
+        return Err(GitError::CommandFailed(format!(
+            "{ERROR_EMOJI} {ERROR}--no-commit requires --no-remove{ERROR:#}\n\n{HINT_EMOJI} {HINT}Cannot remove active worktree when skipping commit/rebase{HINT:#}"
+        )));
+    }
+
+    // --no-commit implies --no-squash (validation above ensures --no-remove is already set)
+    let squash_enabled = if no_commit { false } else { squash_enabled };
 
     // Get target branch (default to default branch if not provided)
     let target_branch = repo.resolve_target_branch(target)?;
@@ -75,8 +91,8 @@ pub fn handle_merge(
     // Load config for LLM integration
     let config = WorktrunkConfig::load().git_context("Failed to load config")?;
 
-    // Handle uncommitted changes depending on whether we're squashing
-    if repo.is_dirty()? {
+    // Handle uncommitted changes (skip if --no-commit)
+    if !no_commit && repo.is_dirty()? {
         if squash_enabled {
             // Warn about untracked files before staging
             if !tracked_only {
@@ -108,11 +124,13 @@ pub fn handle_merge(
         handle_squash(&target_branch, no_verify, force)?;
     }
 
-    // Rebase onto target (delegate to atomic dev command)
-    super::dev::handle_dev_rebase(Some(&target_branch))?;
+    // Rebase onto target (skip if --no-commit)
+    if !no_commit {
+        super::dev::handle_dev_rebase(Some(&target_branch))?;
+    }
 
     // Run pre-merge checks unless --no-verify was specified
-    // Do this AFTER rebase to validate the final state that will be pushed
+    // Do this after commit/squash/rebase to validate the final state that will be pushed
     if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
         let worktree_path =
             std::env::current_dir().git_context("Failed to get current directory")?;

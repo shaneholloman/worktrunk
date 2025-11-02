@@ -1677,3 +1677,173 @@ fn test_merge_no_remote() {
     // Try to merge without specifying target (should fail - no remote to get default branch)
     snapshot_merge("merge_no_remote", &repo, &[], Some(&feature_wt));
 }
+
+#[test]
+fn test_merge_no_commit_with_clean_tree() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a worktree for main
+    let main_wt = repo.root_path().parent().unwrap().join("test-repo.main-wt");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["worktree", "add", main_wt.to_str().unwrap(), "main"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to add worktree");
+
+    // Create a feature worktree with commits (clean tree)
+    let feature_wt = repo.add_worktree("feature", "feature");
+    fs::write(feature_wt.join("feature.txt"), "feature content").expect("Failed to write file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "feature.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Add feature file"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Merge with --no-commit (should succeed - clean tree)
+    let settings = setup_snapshot_settings(&repo);
+    settings.bind(|| {
+        let mut cmd = make_snapshot_cmd(
+            &repo,
+            "merge",
+            &["main", "--no-commit", "--no-remove"],
+            Some(&feature_wt),
+        );
+        assert_cmd_snapshot!(cmd, @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        🔄 [36mMerging 1 commit to [1m[36mmain[0m[0m @ [SHA]
+
+        * [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Add feature file
+
+         feature.txt | 1 [32m+[m
+         1 file changed, 1 insertion(+)
+
+        ✅ [32mMerged to [1m[32mmain[0m (1 commit, 1 file, [32m+1[0m)  [0m
+
+        ✅ [32mKept worktree (use 'wt remove' to clean up)[0m
+
+        ----- stderr -----
+        ");
+    });
+}
+
+#[test]
+fn test_merge_no_commit_with_dirty_tree() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a feature worktree with a commit
+    let feature_wt = repo.add_worktree("feature", "feature");
+    fs::write(feature_wt.join("committed.txt"), "committed content").expect("Failed to write file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "committed.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Add committed file"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Add uncommitted changes
+    fs::write(feature_wt.join("uncommitted.txt"), "uncommitted content")
+        .expect("Failed to write file");
+
+    // Try to merge with --no-commit (should fail - dirty tree)
+    let settings = setup_snapshot_settings(&repo);
+    settings.bind(|| {
+        let mut cmd =
+            make_snapshot_cmd(&repo, "merge", &["main", "--no-commit"], Some(&feature_wt));
+        assert_cmd_snapshot!(cmd, @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+
+        ----- stderr -----
+        ❌ [31mWorking tree has uncommitted changes[0m
+
+        💡 [2mCommit or stash them first[0m
+        ");
+    });
+}
+
+#[test]
+fn test_merge_no_commit_no_squash_no_remove_redundant() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a worktree for main
+    let main_wt = repo.root_path().parent().unwrap().join("test-repo.main-wt");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["worktree", "add", main_wt.to_str().unwrap(), "main"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to add worktree");
+
+    // Create a feature worktree with commits (clean tree)
+    let feature_wt = repo.add_worktree("feature", "feature");
+    fs::write(feature_wt.join("feature.txt"), "feature content").expect("Failed to write file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "feature.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Add feature file"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Merge with --no-commit --no-squash --no-remove (redundant but valid - should succeed)
+    let settings = setup_snapshot_settings(&repo);
+    settings.bind(|| {
+        let mut cmd = make_snapshot_cmd(
+            &repo,
+            "merge",
+            &["main", "--no-commit", "--no-squash", "--no-remove"],
+            Some(&feature_wt),
+        );
+        assert_cmd_snapshot!(cmd, @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        🔄 [36mMerging 1 commit to [1m[36mmain[0m[0m @ [SHA]
+
+        * [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Add feature file
+
+         feature.txt | 1 [32m+[m
+         1 file changed, 1 insertion(+)
+
+        ✅ [32mMerged to [1m[32mmain[0m (1 commit, 1 file, [32m+1[0m)  [0m
+
+        ✅ [32mKept worktree (use 'wt remove' to clean up)[0m
+
+        ----- stderr -----
+        ");
+    });
+}

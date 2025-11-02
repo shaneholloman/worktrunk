@@ -255,6 +255,10 @@ Skip pre-merge commands:
         #[arg(long = "no-squash", action = ArgAction::SetFalse, default_value_t = true)]
         squash_enabled: bool,
 
+        /// Push commits as-is without transformations (requires clean tree; implies --no-squash, --no-remove, and skips rebase)
+        #[arg(long)]
+        no_commit: bool,
+
         /// Keep worktree after merging (don't remove)
         #[arg(long = "no-remove")]
         no_remove: bool,
@@ -515,6 +519,7 @@ fn main() {
         Commands::Merge {
             target,
             squash_enabled,
+            no_commit,
             no_remove,
             no_verify,
             force,
@@ -522,6 +527,7 @@ fn main() {
         } => handle_merge(
             target.as_deref(),
             squash_enabled,
+            no_commit,
             no_remove,
             no_verify,
             force,

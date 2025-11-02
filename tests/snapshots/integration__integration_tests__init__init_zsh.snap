@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpCEH56P/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpZD3Pf7/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -339,6 +339,7 @@ _arguments "${_arguments_options[@]}" : \
 (merge)
 _arguments "${_arguments_options[@]}" : \
 '--no-squash[Disable squashing commits (by default, commits are squashed into one before merging)]' \
+'--no-commit[Push commits as-is without transformations (requires clean tree; implies --no-squash, --no-remove, and skips rebase)]' \
 '--no-remove[Keep worktree after merging (don'\''t remove)]' \
 '--no-verify[Skip all project hooks (pre-merge-command)]' \
 '-f[Skip approval prompts for commands]' \
