@@ -1,5 +1,33 @@
+// Benchmarks for `wt list` command
+//
+// This suite includes both synthetic and real-world repository benchmarks:
+//
+// 1. Synthetic benchmarks (fast, deterministic):
+//    - bench_list_by_worktree_count: Varies worktree count (1-8)
+//    - bench_list_by_repo_profile: Tests minimal/typical/large repo sizes
+//    - bench_sequential_vs_parallel: Compares sequential vs parallel implementations
+//
+// 2. Real repository benchmarks (slower, more realistic):
+//    - bench_list_real_repo: Uses rust-lang/rust repo (cloned to target/bench-repos/)
+//
+// Run all benchmarks:
+//   cargo bench --bench list
+//
+// Run specific benchmark:
+//   cargo bench --bench list bench_list_by_worktree_count
+//   cargo bench --bench list bench_list_real_repo
+//
+// Note: Real repo benchmarks will clone rust-lang/rust on first run (~2-5 minutes).
+// The clone is cached in target/bench-repos/ and reused across runs.
+//
+// CI benchmarks are not included because:
+// - The expensive operations (GitHub/GitLab API calls) are network-dependent
+// - CI detection (env var checking) is trivial (<1μs overhead)
+// - Output formatting differences are minimal
+// - Mocking APIs for reproducible benchmarks would be complex and not representative
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -54,6 +82,21 @@ fn run_git(path: &Path, args: &[&str]) {
         String::from_utf8_lossy(&output.stdout),
         path.display()
     );
+}
+
+/// Build release binary and return path.
+/// This is idempotent - cargo skips rebuild if already up-to-date.
+fn get_release_binary() -> PathBuf {
+    let build_output = Command::new("cargo")
+        .args(["build", "--release"])
+        .output()
+        .unwrap();
+    assert!(
+        build_output.status.success(),
+        "Failed to build release binary: {}",
+        String::from_utf8_lossy(&build_output.stderr)
+    );
+    std::env::current_dir().unwrap().join("target/release/wt")
 }
 
 /// Create a realistic repository with actual commit history and file changes
@@ -189,17 +232,7 @@ fn add_worktree_with_divergence(
 fn bench_list_by_worktree_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("list_by_worktree_count");
 
-    // Build release binary once
-    let build_output = Command::new("cargo")
-        .args(["build", "--release"])
-        .output()
-        .unwrap();
-    assert!(
-        build_output.status.success(),
-        "Failed to build release binary"
-    );
-
-    let binary = std::env::current_dir().unwrap().join("target/release/wt");
+    let binary = get_release_binary();
 
     // Use "typical" profile for this benchmark
     let profile = &PROFILES[1];
@@ -246,7 +279,7 @@ fn bench_list_by_worktree_count(c: &mut Criterion) {
 fn bench_list_by_repo_profile(c: &mut Criterion) {
     let mut group = c.benchmark_group("list_by_profile");
 
-    let binary = std::env::current_dir().unwrap().join("target/release/wt");
+    let binary = get_release_binary();
 
     // Fixed worktree count to isolate repo size impact
     let num_worktrees = 4;
@@ -290,17 +323,7 @@ fn bench_list_by_repo_profile(c: &mut Criterion) {
 fn bench_sequential_vs_parallel(c: &mut Criterion) {
     let mut group = c.benchmark_group("sequential_vs_parallel");
 
-    // Build release binary once
-    let build_output = Command::new("cargo")
-        .args(["build", "--release"])
-        .output()
-        .unwrap();
-    assert!(
-        build_output.status.success(),
-        "Failed to build release binary"
-    );
-
-    let binary = std::env::current_dir().unwrap().join("target/release/wt");
+    let binary = get_release_binary();
 
     let profile = &PROFILES[1]; // typical profile
 
@@ -357,12 +380,137 @@ fn bench_sequential_vs_parallel(c: &mut Criterion) {
     group.finish();
 }
 
+/// Get or clone the rust-lang/rust repository to a cached location.
+/// This persists across benchmark runs but is cleaned by `cargo clean`.
+fn get_or_clone_rust_repo() -> PathBuf {
+    let cache_dir = std::env::current_dir().unwrap().join("target/bench-repos");
+    let rust_repo = cache_dir.join("rust");
+
+    if rust_repo.exists() {
+        // Verify it's a valid git repo
+        let output = Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(&rust_repo)
+            .output();
+
+        match output {
+            Ok(out) if out.status.success() => {
+                println!("Using cached rust repo at {}", rust_repo.display());
+                return rust_repo;
+            }
+            Ok(out) => {
+                panic!(
+                    "Git rev-parse failed in cached repo: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            }
+            Err(e) => {
+                panic!("Failed to execute git command: {}", e);
+            }
+        }
+    }
+
+    // Clone the repo
+    std::fs::create_dir_all(&cache_dir).unwrap();
+    println!(
+        "Cloning rust-lang/rust to {} (this will take several minutes)...",
+        rust_repo.display()
+    );
+
+    // Do a full clone to ensure we have all history. This takes longer on first run
+    // (~5-10 minutes) but is cached in target/bench-repos/ for subsequent runs.
+    let clone_output = Command::new("git")
+        .args([
+            "clone",
+            "https://github.com/rust-lang/rust.git",
+            rust_repo.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        clone_output.status.success(),
+        "Failed to clone rust repo: {}",
+        String::from_utf8_lossy(&clone_output.stderr)
+    );
+
+    println!("Rust repo cloned successfully");
+    rust_repo
+}
+
+fn bench_list_real_repo(c: &mut Criterion) {
+    let mut group = c.benchmark_group("list_real_repo");
+
+    let binary = get_release_binary();
+
+    // Get or clone the rust repo (cached across runs)
+    let rust_repo = get_or_clone_rust_repo();
+
+    // Test with different worktree counts
+    for num_worktrees in [1, 2, 4, 6, 8] {
+        // Create a temporary workspace for this benchmark run
+        let temp = tempfile::tempdir().unwrap();
+        let workspace_main = temp.path().join("main");
+
+        // Copy the rust repo to the temp location (git worktree needs the original)
+        // Use git clone --local for fast copy with shared objects
+        let clone_output = Command::new("git")
+            .args([
+                "clone",
+                "--local",
+                rust_repo.to_str().unwrap(),
+                workspace_main.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            clone_output.status.success(),
+            "Failed to clone rust repo to workspace: {}",
+            String::from_utf8_lossy(&clone_output.stderr)
+        );
+
+        run_git(&workspace_main, &["config", "user.name", "Benchmark"]);
+        run_git(&workspace_main, &["config", "user.email", "bench@test.com"]);
+
+        // Add worktrees with realistic changes
+        for i in 1..num_worktrees {
+            add_worktree_with_divergence(
+                &temp,
+                &workspace_main,
+                i,
+                10, // commits ahead
+                0,  // commits behind (skip for now)
+                3,  // uncommitted files
+            );
+        }
+
+        // Warm up git's internal caches
+        run_git(&workspace_main, &["status"]);
+
+        group.bench_with_input(
+            BenchmarkId::new("rust_repo", num_worktrees),
+            &num_worktrees,
+            |b, _| {
+                b.iter(|| {
+                    Command::new(&binary)
+                        .arg("list")
+                        .current_dir(&workspace_main)
+                        .output()
+                        .unwrap();
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default()
         .sample_size(30)
         .measurement_time(std::time::Duration::from_secs(15))
         .warm_up_time(std::time::Duration::from_secs(3));
-    targets = bench_list_by_worktree_count, bench_list_by_repo_profile, bench_sequential_vs_parallel
+    targets = bench_list_by_worktree_count, bench_list_by_repo_profile, bench_sequential_vs_parallel, bench_list_real_repo
 }
 criterion_main!(benches);
