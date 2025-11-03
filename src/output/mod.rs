@@ -68,7 +68,9 @@ pub use global::{
 };
 
 // Re-export output handlers
-pub use handlers::{execute_command_in_worktree, handle_remove_output, handle_switch_output};
+pub use handlers::{
+    execute_command_in_worktree, execute_user_command, handle_remove_output, handle_switch_output,
+};
 
 use std::path::Path;
 

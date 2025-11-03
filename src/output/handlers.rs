@@ -66,31 +66,35 @@ fn shell_integration_hint() -> &'static str {
 pub fn handle_switch_output(
     result: &SwitchResult,
     branch: &str,
-    execute: Option<&str>,
+    has_execute_command: bool,
 ) -> Result<(), GitError> {
-    use worktrunk::styling::{CYAN, format_bash_with_gutter};
-
     // Set target directory for command execution
     super::change_directory(result.path())?;
 
     // Show success message (includes emoji and color)
     super::success(format_switch_message(result, branch))?;
 
-    // Execute command if provided
-    if let Some(cmd) = execute {
-        // Show what command is being executed (matches post-create/post-start format)
-        super::progress(format!("🔄 {CYAN}Executing (--execute):{CYAN:#}"))?;
-        super::progress(format_bash_with_gutter(cmd, ""))?;
-
-        super::execute(cmd)?;
-    } else {
-        // No execute command: show shell integration hint
-        // (suppressed in directive mode since user already has integration)
+    // If no execute command provided: show shell integration hint
+    // (suppressed in directive mode since user already has integration)
+    if !has_execute_command {
         super::hint(format!("\n{}", shell_integration_hint()))?;
     }
 
     // Flush output (important for directive mode)
     super::flush()?;
+
+    Ok(())
+}
+
+/// Execute the --execute command after hooks have run
+pub fn execute_user_command(command: &str) -> Result<(), GitError> {
+    use worktrunk::styling::{CYAN, format_bash_with_gutter};
+
+    // Show what command is being executed (matches post-create/post-start format)
+    super::progress(format!("🔄 {CYAN}Executing (--execute):{CYAN:#}"))?;
+    super::progress(format_bash_with_gutter(command, ""))?;
+
+    super::execute(command)?;
 
     Ok(())
 }

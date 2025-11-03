@@ -17,7 +17,7 @@ use commands::{
     handle_dev_commit, handle_dev_push, handle_dev_rebase, handle_dev_run_hook, handle_dev_squash,
     handle_init, handle_list, handle_merge, handle_remove, handle_switch,
 };
-use output::{handle_remove_output, handle_switch_output};
+use output::{execute_user_command, handle_remove_output, handle_switch_output};
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum OutputFormat {
@@ -454,7 +454,7 @@ fn main() {
                     handle_switch(&branch, create, base.as_deref(), force, no_verify, &config)?;
 
                 // Show success message (temporal locality: immediately after worktree creation)
-                handle_switch_output(&result, &branch, execute.as_deref())?;
+                handle_switch_output(&result, &branch, execute.is_some())?;
 
                 // Now spawn post-start hooks (background processes, after success message)
                 if !no_verify {
@@ -466,6 +466,11 @@ fn main() {
                         &branch,
                         force,
                     )?;
+                }
+
+                // Execute user command after post-start hooks have been spawned
+                if let Some(cmd) = execute {
+                    execute_user_command(&cmd)?;
                 }
 
                 Ok(())
