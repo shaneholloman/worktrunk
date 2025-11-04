@@ -87,8 +87,14 @@ impl DirectiveOutput {
     ///
     /// In directive mode, the shell wrapper will actually change directories,
     /// so we can say "changed directory to {path}"
-    pub fn format_switch_success(&self, branch: &str, path: &Path, created_branch: bool) -> String {
-        super::format_switch_success_message(branch, path, created_branch, true)
+    pub fn format_switch_success(
+        &self,
+        branch: &str,
+        path: &Path,
+        created_branch: bool,
+        base_branch: Option<&str>,
+    ) -> String {
+        super::format_switch_success_message(branch, path, created_branch, base_branch, true)
     }
 }
 

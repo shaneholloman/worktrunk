@@ -117,7 +117,11 @@ pub enum SwitchResult {
     /// Switched to existing worktree at the given path
     ExistingWorktree(PathBuf),
     /// Created new worktree at the given path
-    CreatedWorktree { path: PathBuf, created_branch: bool },
+    CreatedWorktree {
+        path: PathBuf,
+        created_branch: bool,
+        base_branch: Option<String>,
+    },
 }
 
 impl SwitchResult {
@@ -233,6 +237,7 @@ pub fn handle_switch(
     Ok(SwitchResult::CreatedWorktree {
         path: worktree_path,
         created_branch: create,
+        base_branch: base.map(String::from),
     })
 }
 

@@ -141,10 +141,19 @@ pub fn terminate_output() -> io::Result<()> {
 ///
 /// In interactive mode: "at {path}" (can't actually change directory)
 /// In directive mode: "changed directory to {path}" (shell will change it)
-pub fn format_switch_success(branch: &str, path: &Path, created_branch: bool) -> String {
+pub fn format_switch_success(
+    branch: &str,
+    path: &Path,
+    created_branch: bool,
+    base_branch: Option<&str>,
+) -> String {
     OUTPUT_CONTEXT.with(|ctx| match &*ctx.borrow() {
-        OutputHandler::Interactive(i) => i.format_switch_success(branch, path, created_branch),
-        OutputHandler::Directive(d) => d.format_switch_success(branch, path, created_branch),
+        OutputHandler::Interactive(i) => {
+            i.format_switch_success(branch, path, created_branch, base_branch)
+        }
+        OutputHandler::Directive(d) => {
+            d.format_switch_success(branch, path, created_branch, base_branch)
+        }
     })
 }
 

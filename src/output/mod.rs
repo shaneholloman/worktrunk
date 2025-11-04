@@ -77,12 +77,13 @@ use std::path::Path;
 /// Format a switch success message with mode-specific location phrase
 ///
 /// The message format differs between interactive and directive modes:
-/// - Interactive: "Created new worktree for {branch} at {path}"
-/// - Directive: "Created new worktree for {branch}, changed directory to {path}"
+/// - Interactive: "Created new worktree for {branch} from {base} at {path}"
+/// - Directive: "Created new worktree for {branch} from {base}, changed directory to {path}"
 pub(crate) fn format_switch_success_message(
     branch: &str,
     path: &Path,
     created_branch: bool,
+    base_branch: Option<&str>,
     use_past_tense: bool,
 ) -> String {
     use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
@@ -93,6 +94,9 @@ pub(crate) fn format_switch_success_message(
     } else {
         "Switched to worktree for"
     };
+    let base_suffix = base_branch
+        .map(|b| format!(" from {green_bold}{b}{green_bold:#}{GREEN}"))
+        .unwrap_or_default();
     let location = if use_past_tense {
         ", changed directory to"
     } else {
@@ -100,7 +104,7 @@ pub(crate) fn format_switch_success_message(
     };
 
     format!(
-        "{SUCCESS_EMOJI} {GREEN}{action} {green_bold}{branch}{green_bold:#}{GREEN}{location} {green_bold}{}{green_bold:#}{GREEN:#}",
+        "{SUCCESS_EMOJI} {GREEN}{action} {green_bold}{branch}{green_bold:#}{GREEN}{base_suffix}{location} {green_bold}{}{green_bold:#}{GREEN:#}",
         path.display()
     )
 }

@@ -28,6 +28,41 @@ When the project reaches v1.0 or gains users, we'll adopt stability commitments.
 
 ## CLI Output Formatting Standards
 
+### User Message Principles
+
+**Core Principle: Acknowledge user-supplied arguments in output messages.**
+
+When users provide explicit arguments (flags, options, values), the output should recognize and reflect those choices. This confirms the program understood their intent and used their input correctly.
+
+**Examples:**
+
+```rust
+// User runs: wt switch --create feature --base=main
+// ✅ GOOD - acknowledges the base branch
+"Created new worktree for feature from main at /path/to/worktree"
+
+// ❌ BAD - ignores the base argument
+"Created new worktree for feature at /path/to/worktree"
+
+// User runs: wt merge --squash
+// ✅ GOOD - acknowledges squash mode
+"Squashing 3 commits into 1..."
+
+// ❌ BAD - doesn't mention squashing
+"Merging commits..."
+```
+
+**Why this matters:**
+- Builds confidence that arguments were parsed correctly
+- Helps users understand what the command actually did
+- Makes output more informative and traceable
+- Prevents confusion about which options were applied
+
+**Implementation pattern:**
+- When formatting messages, include information from user-supplied arguments
+- Don't just use defaults silently—show what was chosen
+- For optional arguments, conditionally include them in the message
+
 ### The anstyle Ecosystem
 
 All styling uses the **anstyle ecosystem** for composable, auto-detecting terminal output:

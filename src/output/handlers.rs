@@ -9,14 +9,15 @@ fn format_switch_message(result: &SwitchResult, branch: &str) -> String {
     match result {
         SwitchResult::ExistingWorktree(path) => {
             // created_branch=false means we switched to existing worktree
-            format_switch_success(branch, path, false)
+            format_switch_success(branch, path, false, None)
         }
         SwitchResult::CreatedWorktree {
             path,
             created_branch,
+            base_branch,
         } => {
-            // Pass through whether we created a new branch
-            format_switch_success(branch, path, *created_branch)
+            // Pass through whether we created a new branch and the base branch
+            format_switch_success(branch, path, *created_branch, base_branch.as_deref())
         }
     }
 }
