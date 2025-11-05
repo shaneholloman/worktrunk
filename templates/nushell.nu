@@ -42,20 +42,20 @@ if (which wt | is-not-empty) or ($env.WORKTRUNK_BIN? | is-not-empty) {
     # Override {{ cmd_prefix }} command to add --internal flag for switch, remove, and merge
     # Use --wrapped to pass through all flags without parsing them
     export def --env --wrapped {{ cmd_prefix }} [...rest] {
-        mut use_dev = false
+        mut use_source = false
         mut filtered_args = []
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         for arg in $rest {
-            if $arg == "--dev" {
-                $use_dev = true
+            if $arg == "--source" {
+                $use_source = true
             } else {
                 $filtered_args = ($filtered_args | append $arg)
             }
         }
 
         # Determine which command to use
-        let cmd = if $use_dev {
+        let cmd = if $use_source {
             let build_result = (do { cargo build --quiet } | complete)
             if $build_result.exit_code != 0 {
                 print "Error: cargo build failed"

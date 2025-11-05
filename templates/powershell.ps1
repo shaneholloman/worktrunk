@@ -56,20 +56,20 @@ if ((Get-Command wt -ErrorAction SilentlyContinue) -or $env:WORKTRUNK_BIN) {
             [string[]]$Arguments
         )
 
-        $useDev = $false
+        $useSource = $false
         $filteredArgs = @()
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         foreach ($arg in $Arguments) {
-            if ($arg -eq "--dev") {
-                $useDev = $true
+            if ($arg -eq "--source") {
+                $useSource = $true
             } else {
                 $filteredArgs += $arg
             }
         }
 
         # Determine which command to use
-        if ($useDev) {
+        if ($useSource) {
             # Build the project
             cargo build --quiet 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {

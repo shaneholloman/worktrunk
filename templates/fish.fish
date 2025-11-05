@@ -90,21 +90,21 @@ if type -q {{ cmd_prefix }}; or set -q WORKTRUNK_BIN
 
     # Override {{ cmd_prefix }} command to add --internal flag for switch, remove, and merge
     function {{ cmd_prefix }}
-        set -l use_dev false
+        set -l use_source false
         set -l args
         set -l saved_cmd $_WORKTRUNK_CMD
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         for arg in $argv
-            if test "$arg" = "--dev"
-                set use_dev true
+            if test "$arg" = "--source"
+                set use_source true
             else
                 set -a args $arg
             end
         end
 
-        # If --dev was specified, build and use local debug binary
-        if test $use_dev = true
+        # If --source was specified, build and use local debug binary
+        if test $use_source = true
             if not cargo build --quiet >/dev/null 2>&1
                 echo "Error: cargo build failed" >&2
                 set _WORKTRUNK_CMD $saved_cmd

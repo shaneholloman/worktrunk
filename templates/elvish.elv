@@ -55,21 +55,21 @@ if (or (has-external wt) (has-env WORKTRUNK_BIN)) {
 
     # Override {{ cmd_prefix }} command to add --internal flag for switch, remove, and merge
     fn {{ cmd_prefix }} {|@args|
-        var use-dev = $false
+        var use-source = $false
         var filtered-args = []
         var saved-cmd = $_WORKTRUNK_CMD
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         for arg $args {
-            if (eq $arg "--dev") {
-                set use-dev = $true
+            if (eq $arg "--source") {
+                set use-source = $true
             } else {
                 set filtered-args = [$@filtered-args $arg]
             }
         }
 
-        # If --dev was specified, build and use local debug binary
-        if $use-dev {
+        # If --source was specified, build and use local debug binary
+        if $use-source {
             try {
                 e:cargo build --quiet 2>&1 | slurp
             } catch e {

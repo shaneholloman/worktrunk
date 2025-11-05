@@ -44,18 +44,18 @@ if shutil.which("wt") is not None or os.environ.get('WORKTRUNK_BIN'):
 
     def _{{ cmd_prefix }}_wrapper(args):
         """Override {{ cmd_prefix }} command to add --internal flag for switch, remove, and merge"""
-        use_dev = False
+        use_source = False
         filtered_args = []
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         for arg in args:
-            if arg == "--dev":
-                use_dev = True
+            if arg == "--source":
+                use_source = True
             else:
                 filtered_args.append(arg)
 
         # Determine which command to use
-        if use_dev:
+        if use_source:
             # Build the project
             build_result = !(cargo build --quiet)
             if build_result.returncode != 0:

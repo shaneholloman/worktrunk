@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpwN6n08/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpAVt9Qw/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -77,21 +77,21 @@ if command -v wt >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]]; then
 
     # Override wt command to add --internal flag for switch, remove, and merge
     wt() {
-        local use_dev=false
+        local use_source=false
         local args=()
         local saved_cmd="$_WORKTRUNK_CMD"
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         for arg in "$@"; do
-            if [[ "$arg" == "--dev" ]]; then
-                use_dev=true
+            if [[ "$arg" == "--source" ]]; then
+                use_source=true
             else
                 args+=("$arg")
             fi
         done
 
-        # If --dev was specified, build and use local debug binary
-        if [[ "$use_dev" == true ]]; then
+        # If --source was specified, build and use local debug binary
+        if [[ "$use_source" == true ]]; then
             if ! cargo build --quiet >/dev/null 2>&1; then
                 echo "Error: cargo build failed" >&2
                 _WORKTRUNK_CMD="$saved_cmd"

@@ -54,21 +54,21 @@ if command -v wt >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]]; then
 
     # Override {{ cmd_prefix }} command to add --internal flag for switch, remove, and merge
     {{ cmd_prefix }}() {
-        local use_dev=false
+        local use_source=false
         local args=()
         local saved_cmd="$_WORKTRUNK_CMD"
 
-        # Check for --dev flag and strip it
+        # Check for --source flag and strip it
         for arg in "$@"; do
-            if [[ "$arg" == "--dev" ]]; then
-                use_dev=true
+            if [[ "$arg" == "--source" ]]; then
+                use_source=true
             else
                 args+=("$arg")
             fi
         done
 
-        # If --dev was specified, build and use local debug binary
-        if [[ "$use_dev" == true ]]; then
+        # If --source was specified, build and use local debug binary
+        if [[ "$use_source" == true ]]; then
             if ! cargo build --quiet >/dev/null 2>&1; then
                 echo "Error: cargo build failed" >&2
                 _WORKTRUNK_CMD="$saved_cmd"
