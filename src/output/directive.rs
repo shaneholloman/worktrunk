@@ -31,6 +31,7 @@
 
 use std::io::{self, Write};
 use std::path::Path;
+use worktrunk::styling::{INFO_EMOJI, PROGRESS_EMOJI, SUCCESS_EMOJI, WARNING_EMOJI};
 
 /// Directive output mode for shell integration
 ///
@@ -45,15 +46,14 @@ impl DirectiveOutput {
     }
 
     pub fn success(&mut self, message: String) -> io::Result<()> {
-        // Don't strip colors - users see this output and need styling
-        write!(io::stdout(), "{}\0", message)?;
+        // Success messages automatically include the ✅ emoji
+        write!(io::stdout(), "{SUCCESS_EMOJI} {message}\0")?;
         io::stdout().flush()
     }
 
     pub fn progress(&mut self, message: String) -> io::Result<()> {
-        // Progress messages are for humans - output them just like success messages
-        // The shell wrapper will display these to users with colors preserved
-        write!(io::stdout(), "{}\0", message)?;
+        // Progress messages automatically include the 🔄 emoji
+        write!(io::stdout(), "{PROGRESS_EMOJI} {message}\0")?;
         io::stdout().flush()
     }
 
@@ -61,6 +61,18 @@ impl DirectiveOutput {
         // Hints are only for interactive mode - suppress in directive mode
         // When users run through shell wrapper, they already have integration
         Ok(())
+    }
+
+    pub fn info(&mut self, message: String) -> io::Result<()> {
+        // Info messages automatically include the ⚪ emoji
+        write!(io::stdout(), "{INFO_EMOJI} {message}\0")?;
+        io::stdout().flush()
+    }
+
+    pub fn warning(&mut self, message: String) -> io::Result<()> {
+        // Warning messages automatically include the 🟡 emoji
+        write!(io::stdout(), "{WARNING_EMOJI} {message}\0")?;
+        io::stdout().flush()
     }
 
     pub fn change_directory(&mut self, path: &Path) -> io::Result<()> {

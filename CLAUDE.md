@@ -527,12 +527,21 @@ output::execute("git pull")?;
 
 The output module (`src/output/global.rs`) provides these functions:
 
-- `success(message)` - Emit success messages (both modes)
-- `progress(message)` - Emit progress updates (interactive only, suppressed in directive)
+- `success(message)` - Emit success messages (✅, both modes)
+- `progress(message)` - Emit progress updates (🔄, both modes)
+- `info(message)` - Emit info messages (⚪, both modes)
+- `warning(message)` - Emit warning messages (🟡, both modes)
+- `hint(message)` - Emit hint messages (💡, interactive only, suppressed in directive)
 - `change_directory(path)` - Request directory change (directive) or store for execution (interactive)
 - `execute(command)` - Execute command (interactive) or emit directive (directive mode)
-- `command_output(stdout, stderr)` - Display output from external commands
 - `flush()` - Flush output buffers
+
+**When to use each function:**
+- `success()` - Successful completion (e.g., "✅ Committed changes")
+- `progress()` - Operations in progress (e.g., "🔄 Squashing commits...")
+- `info()` - Neutral status/metadata (e.g., "⚪ No changes detected")
+- `warning()` - Non-blocking issues (e.g., "🟡 Uncommitted changes detected")
+- `hint()` - Actionable suggestions for users (e.g., "💡 Run 'wt config help'")
 
 For the complete API, see `src/output/global.rs`.
 

@@ -3,6 +3,7 @@ source: tests/integration_tests/push.rs
 info:
   program: wt
   args:
+    - dev
     - push
   env:
     CLICOLOR_FORCE: "1"
@@ -15,11 +16,11 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpjaOCrN/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpHXGRjT/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-✅ [32mPushed to [1m[32mfeature[0m[0m
+🔄 ✅ [32mPushed to [1m[32mfeature[0m[0m
 
 ----- stderr -----

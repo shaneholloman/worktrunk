@@ -96,6 +96,34 @@ pub fn hint(message: impl Into<String>) -> io::Result<()> {
     })
 }
 
+/// Emit an info message
+///
+/// Info messages are neutral status updates like "⚪ No changes detected"
+/// They use INFO_EMOJI (⚪) and dimmed styling.
+pub fn info(message: impl Into<String>) -> io::Result<()> {
+    OUTPUT_CONTEXT.with(|ctx| {
+        let msg = message.into();
+        match &mut *ctx.borrow_mut() {
+            OutputHandler::Interactive(i) => i.info(msg),
+            OutputHandler::Directive(d) => d.info(msg),
+        }
+    })
+}
+
+/// Emit a warning message
+///
+/// Warning messages are non-blocking issues like "🟡 Uncommitted changes detected"
+/// They use WARNING_EMOJI (🟡) and warning styling.
+pub fn warning(message: impl Into<String>) -> io::Result<()> {
+    OUTPUT_CONTEXT.with(|ctx| {
+        let msg = message.into();
+        match &mut *ctx.borrow_mut() {
+            OutputHandler::Interactive(i) => i.warning(msg),
+            OutputHandler::Directive(d) => d.warning(msg),
+        }
+    })
+}
+
 /// Request directory change (for shell integration)
 pub fn change_directory(path: impl AsRef<Path>) -> io::Result<()> {
     OUTPUT_CONTEXT.with(|ctx| {

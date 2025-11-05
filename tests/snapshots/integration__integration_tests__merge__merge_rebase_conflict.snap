@@ -16,12 +16,12 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpHIlJFB/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpBEhib3/test-config.toml
 ---
 success: false
 exit_code: 1
 ----- stdout -----
-🔄 [36mRebasing onto [1m[36mmain[0m[36m...[0m
+🔄 🔄 [36mRebasing onto [1m[36mmain[0m[36m...[0m
 
 ----- stderr -----
 ❌ [31mRebase onto [1m[31mmain[0m[31m incomplete[0m

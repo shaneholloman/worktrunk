@@ -2,7 +2,7 @@ use worktrunk::HookType;
 use worktrunk::config::{Command, CommandPhase, ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, GitResultExt, Repository};
 use worktrunk::styling::{
-    AnstyleStyle, CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, HINT, HINT_EMOJI, WARNING, WARNING_EMOJI,
+    AnstyleStyle, CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, HINT, HINT_EMOJI, WARNING,
     format_bash_with_gutter, format_with_gutter,
 };
 
@@ -95,8 +95,8 @@ fn show_untracked_warning(repo: &Repository) -> Result<(), GitError> {
     // Format file list (comma-separated)
     let file_list = untracked.join(", ");
 
-    crate::output::progress(format!(
-        "{WARNING_EMOJI} {WARNING}Auto-staging untracked files: {file_list}{WARNING:#}"
+    crate::output::warning(format!(
+        "{WARNING}Auto-staging untracked files: {file_list}{WARNING:#}"
     ))?;
 
     Ok(())
@@ -266,7 +266,7 @@ pub fn handle_merge(
         }
 
         // STEP 4: Remove worktree and delete branch
-        crate::output::progress(format!("🔄 {CYAN}Removing worktree & branch...{CYAN:#}"))?;
+        crate::output::progress(format!("{CYAN}Removing worktree & branch...{CYAN:#}"))?;
         let worktree_root = repo.worktree_root()?;
         repo.remove_worktree(&worktree_root)
             .git_context("Failed to remove worktree")?;
@@ -508,7 +508,7 @@ pub fn run_pre_merge_commands(
     )?;
     for prepared in commands {
         let label = crate::commands::format_command_label("pre-merge", prepared.name.as_deref());
-        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
+        crate::output::progress(format!("{CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
@@ -577,19 +577,18 @@ pub fn execute_post_merge_commands(
     // Execute each command sequentially in the main worktree
     for prepared in commands {
         let label = crate::commands::format_command_label("post-merge", prepared.name.as_deref());
-        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
+        crate::output::progress(format!("{CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(main_worktree_path, &prepared.expanded) {
-            use worktrunk::styling::WARNING_EMOJI;
             let warning_bold = WARNING.bold();
             let message = match &prepared.name {
                 Some(name) => format!(
-                    "{WARNING_EMOJI} {WARNING}Command {warning_bold}{name}{warning_bold:#} failed: {e}{WARNING:#}"
+                    "{WARNING}Command {warning_bold}{name}{warning_bold:#} failed: {e}{WARNING:#}"
                 ),
-                None => format!("{WARNING_EMOJI} {WARNING}Command failed: {e}{WARNING:#}"),
+                None => format!("{WARNING}Command failed: {e}{WARNING:#}"),
             };
-            crate::output::progress(message)?;
+            crate::output::warning(message)?;
             // Continue with other commands even if one fails
         }
     }
@@ -647,7 +646,7 @@ pub fn run_pre_commit_commands(
     // Execute each command sequentially
     for prepared in commands {
         let label = crate::commands::format_command_label("pre-commit", prepared.name.as_deref());
-        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
+        crate::output::progress(format!("{CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {

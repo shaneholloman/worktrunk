@@ -283,10 +283,9 @@ pub fn handle_dev_squash(
 
     // Check if there are actually any changes to commit
     if !repo.has_staged_changes()? {
-        use worktrunk::styling::INFO_EMOJI;
         let dim = AnstyleStyle::new().dimmed();
-        crate::output::progress(format!(
-            "{INFO_EMOJI} {dim}No changes after squashing {commit_count} {commit_text} (commits resulted in no net changes){dim:#}"
+        crate::output::info(format!(
+            "{dim}No changes after squashing {commit_count} {commit_text} (commits resulted in no net changes){dim:#}"
         ))?;
         return Ok(false);
     }
@@ -302,10 +301,10 @@ pub fn handle_dev_squash(
         .to_string();
 
     // Show success immediately after completing the squash
-    use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
+    use worktrunk::styling::GREEN;
     let green_dim = GREEN.dimmed();
     crate::output::success(format!(
-        "{SUCCESS_EMOJI} {GREEN}Squashed @ {green_dim}{commit_hash}{green_dim:#}{GREEN:#}"
+        "{GREEN}Squashed @ {green_dim}{commit_hash}{green_dim:#}{GREEN:#}"
     ))?;
 
     Ok(true)
@@ -383,10 +382,10 @@ pub fn handle_dev_rebase(target: Option<&str>) -> Result<bool, GitError> {
     }
 
     // Success
-    use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
+    use worktrunk::styling::GREEN;
     let green_bold = GREEN.bold();
     crate::output::success(format!(
-        "{SUCCESS_EMOJI} {GREEN}Rebased onto {green_bold}{target_branch}{green_bold:#}{GREEN:#}"
+        "{GREEN}Rebased onto {green_bold}{target_branch}{green_bold:#}{GREEN:#}"
     ))?;
 
     Ok(true)
@@ -428,14 +427,11 @@ pub fn handle_dev_ask_approval(force: bool) -> Result<(), GitError> {
 
     // Show result
     if approved {
-        use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
-        crate::output::success(format!(
-            "{SUCCESS_EMOJI} {GREEN}Commands approved!{GREEN:#}"
-        ))?;
+        use worktrunk::styling::GREEN;
+        crate::output::success(format!("{GREEN}Commands approved!{GREEN:#}"))?;
     } else {
-        use worktrunk::styling::INFO_EMOJI;
         let dim = worktrunk::styling::AnstyleStyle::new().dimmed();
-        crate::output::success(format!("{INFO_EMOJI} {dim}Commands declined{dim:#}"))?;
+        crate::output::info(format!("{dim}Commands declined{dim:#}"))?;
     }
 
     Ok(())

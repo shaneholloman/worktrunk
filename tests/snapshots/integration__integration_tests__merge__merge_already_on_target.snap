@@ -15,11 +15,11 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpMD721i/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpCmpGOp/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-✅ [32mAlready on [1m[32mmain[0m, nothing to merge[0m
+✅ ✅ [32mAlready on [1m[32mmain[0m, nothing to merge[0m
 
 ----- stderr -----

@@ -16,29 +16,29 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpl4Ngge/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp8INIVm/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-🔄 [36mSquashing 1 commit with working tree changes into 1[0m (1 file, [32m+1[0m)...
-🔄 [36mGenerating squash commit message...[0m
-💡 [2mUsing fallback commit message. Run 'wt config help' to configure LLM-generated messages[0m
-[40m [0m  [1mSquash commits from main[0m
+🔄 🔄 [36mSquashing 1 commit with working tree changes into 1[0m (1 file, [32m+1[0m)...
+🔄 🔄 [36mGenerating squash commit message...[0m
+💡 💡 [2mUsing fallback commit message. Run 'wt config help' to configure LLM-generated messages[0m
+🔄 [40m [0m  [1mSquash commits from main[0m
 [40m [0m  
 [40m [0m  Combined commits:
 [40m [0m  - feat: initial feature
 
 ✅ [32mSquashed @ [2m[SHA][0m
-🔄 [36mMerging 1 commit to [1m[36mmain[0m @ [2m[SHA][0m (no rebase needed)
+🔄 🔄 [36mMerging 1 commit to [1m[36mmain[0m @ [2m[SHA][0m (no rebase needed)
 
-* [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Squash commits from main
+🔄 * [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Squash commits from main
 
- feature.txt | 1 [32m+[m
+🔄  feature.txt | 1 [32m+[m
  1 file changed, 1 insertion(+)
 
-✅ [32mMerged to [1m[32mmain[0m[0m (1 commit, 1 file, [32m+1[0m)
-✅ [32mReturned to primary at [1m[32m[REPO][0m[0m
+🔄 ✅ [32mMerged to [1m[32mmain[0m[0m (1 commit, 1 file, [32m+1[0m)
+✅ ✅ [32mReturned to primary at [1m[32m[REPO][0m[0m
 🔄 [36mRemoving worktree & branch...[0m
 
 ----- stderr -----

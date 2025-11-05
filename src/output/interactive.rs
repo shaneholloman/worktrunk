@@ -2,7 +2,9 @@
 
 use std::io::{self, Write};
 use std::path::Path;
-use worktrunk::styling::{println, stderr, stdout};
+use worktrunk::styling::{
+    HINT_EMOJI, INFO_EMOJI, PROGRESS_EMOJI, SUCCESS_EMOJI, WARNING_EMOJI, println, stderr, stdout,
+};
 
 use super::handlers::execute_streaming;
 
@@ -21,21 +23,36 @@ impl InteractiveOutput {
     }
 
     pub fn success(&mut self, message: String) -> io::Result<()> {
-        // Messages now include emoji and color directly for consistency across modes
-        println!("{message}");
+        // Success messages automatically include the ✅ emoji
+        println!("{SUCCESS_EMOJI} {message}");
         stdout().flush()?;
         Ok(())
     }
 
     pub fn progress(&mut self, message: String) -> io::Result<()> {
-        println!("{message}");
+        // Progress messages automatically include the 🔄 emoji
+        println!("{PROGRESS_EMOJI} {message}");
         stdout().flush()?;
         Ok(())
     }
 
     pub fn hint(&mut self, message: String) -> io::Result<()> {
-        // Hints are suggestions for interactive users (like "run wt configure-shell")
-        println!("{message}");
+        // Hint messages automatically include the 💡 emoji
+        println!("{HINT_EMOJI} {message}");
+        stdout().flush()?;
+        Ok(())
+    }
+
+    pub fn info(&mut self, message: String) -> io::Result<()> {
+        // Info messages automatically include the ⚪ emoji
+        println!("{INFO_EMOJI} {message}");
+        stdout().flush()?;
+        Ok(())
+    }
+
+    pub fn warning(&mut self, message: String) -> io::Result<()> {
+        // Warning messages automatically include the 🟡 emoji
+        println!("{WARNING_EMOJI} {message}");
         stdout().flush()?;
         Ok(())
     }
