@@ -17,12 +17,12 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpikTJnS/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpNcyKxP/test-config.toml
 ---
 success: false
 exit_code: 1
 ----- stdout -----
-🔄 [36mRunning pre-commit:[0m
+🔄 [36mRunning pre-commit[0m
 🔄 [40m [0m  [1m[34mexit[0m 1[0m
 
 

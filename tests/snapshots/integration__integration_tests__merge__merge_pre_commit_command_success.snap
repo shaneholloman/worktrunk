@@ -17,13 +17,13 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpp0vxlZ/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpM3vS2m/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 🟡 [33mAuto-staging untracked files: feature.txt[0m
-🔄 [36mRunning pre-commit:[0m
+🔄 [36mRunning pre-commit[0m
 🔄 [40m [0m  [1m[34mecho[0m [32m'Pre-commit check passed'[0m[0m
 
 🔄 [36mCommitting with default message...[0m (1 file, [32m+1[0m, no squashing needed)

@@ -17,12 +17,12 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp1C84Tn/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpobeRFC/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-✅ ✅ [32mCreated new worktree for [1m[32mfeature-from-main[0m[32m from [1m[32mmain[0m[32m at [1m[32m[REPO].feature-from-main[0m[0m
+✅ [32mCreated new worktree for [1m[32mfeature-from-main[0m[32m from [1m[32mmain[0m[32m at [1m[32m[REPO].feature-from-main[0m[0m
 💡 
 💡 [2mTo enable automatic cd, run: wt config shell[0m
 

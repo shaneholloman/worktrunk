@@ -86,7 +86,7 @@ pub(crate) fn format_switch_success_message(
     base_branch: Option<&str>,
     use_past_tense: bool,
 ) -> String {
-    use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
+    use worktrunk::styling::GREEN;
     let green_bold = GREEN.bold();
 
     let action = if created_branch {
@@ -100,7 +100,7 @@ pub(crate) fn format_switch_success_message(
     let location = if use_past_tense { ":" } else { " at" };
 
     format!(
-        "{SUCCESS_EMOJI} {GREEN}{action} {green_bold}{branch}{green_bold:#}{GREEN}{base_suffix}{location} {green_bold}{}{green_bold:#}{GREEN:#}",
+        "{GREEN}{action} {green_bold}{branch}{green_bold:#}{GREEN}{base_suffix}{location} {green_bold}{}{green_bold:#}{GREEN:#}",
         path.display()
     )
 }

@@ -24,14 +24,12 @@ fn format_switch_message(result: &SwitchResult, branch: &str) -> String {
 
 /// Format message for remove operation (includes emoji and color for consistency)
 fn format_remove_message(result: &RemoveResult, branch: Option<&str>) -> String {
-    use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
+    use worktrunk::styling::GREEN;
     let green_bold = GREEN.bold();
 
     match result {
         RemoveResult::AlreadyOnDefault(branch) => {
-            format!(
-                "{SUCCESS_EMOJI} {GREEN}Already on default branch {green_bold}{branch}{green_bold:#}{GREEN:#}"
-            )
+            format!("{GREEN}Already on default branch {green_bold}{branch}{green_bold:#}{GREEN:#}")
         }
         RemoveResult::RemovedWorktree {
             primary_path,
@@ -54,17 +52,15 @@ fn format_remove_message(result: &RemoveResult, branch: Option<&str>) -> String 
 
             if *changed_directory {
                 format!(
-                    "{SUCCESS_EMOJI} {GREEN}{action}{branch_suffix}, returned to primary at {green_bold}{}{green_bold:#}{GREEN:#}",
+                    "{GREEN}{action}{branch_suffix}, returned to primary at {green_bold}{}{green_bold:#}{GREEN:#}",
                     primary_path.display()
                 )
             } else {
-                format!("{SUCCESS_EMOJI} {GREEN}{action}{branch_suffix}{GREEN:#}")
+                format!("{GREEN}{action}{branch_suffix}{GREEN:#}")
             }
         }
         RemoveResult::SwitchedToDefault(branch) => {
-            format!(
-                "{SUCCESS_EMOJI} {GREEN}Switched to default branch {green_bold}{branch}{green_bold:#}{GREEN:#}"
-            )
+            format!("{GREEN}Switched to default branch {green_bold}{branch}{green_bold:#}{GREEN:#}")
         }
     }
 }
@@ -104,7 +100,7 @@ pub fn execute_user_command(command: &str) -> Result<(), GitError> {
     use worktrunk::styling::{CYAN, format_bash_with_gutter};
 
     // Show what command is being executed (matches post-create/post-start format)
-    super::progress(format!("🔄 {CYAN}Executing (--execute):{CYAN:#}"))?;
+    super::progress(format!("{CYAN}Executing (--execute){CYAN:#}"))?;
     super::progress(format_bash_with_gutter(command, ""))?;
 
     super::execute(command)?;
