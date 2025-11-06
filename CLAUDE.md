@@ -636,7 +636,7 @@ This maintains "one canonical path": commands have ONE code path that works for 
 
 Using direct prints bypasses the output system and causes directive leaks - directives become visible to users.
 
-**Restricted files** (see `scripts/check-output-system.sh`):
+**Restricted files** (enforced by `tests/output_system_guard.rs`):
 - `src/commands/worktree.rs` (switch, remove)
 - `src/commands/merge.rs`
 
@@ -649,7 +649,7 @@ println!("🔄 Starting operation...");
 crate::output::progress("🔄 Starting operation...")?;
 ```
 
-**Enforcement:** Run `./scripts/check-output-system.sh` to verify compliance. Integration tests catch directive leaks via `tests/integration_tests/shell_wrapper.rs`.
+**Enforcement:** The `check_output_system_usage` test (`cargo test check_output_system_usage`) verifies compliance. Integration tests catch directive leaks via `tests/integration_tests/shell_wrapper.rs`.
 
 ## Command Execution Principles
 

@@ -38,13 +38,6 @@ repos:
         language: pygrep
         types: ["rust"]
         entry: "dbg!"
-      - id: check-output-system
-        name: check-output-system
-        description: Commands using --internal must use crate::output::* functions
-        language: script
-        entry: scripts/check-output-system.sh
-        pass_filenames: false
-        files: "^src/commands/(worktree|merge)\\.rs$"
 
 ci:
   # Currently network access isn't supported in the CI product.
