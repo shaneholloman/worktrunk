@@ -79,6 +79,13 @@ if (or (has-external wt) (has-env WORKTRUNK_BIN)) {
             set _WORKTRUNK_CMD = ./target/debug/wt
         }
 
+        # Force colors if wrapper's stdout is a TTY (respects NO_COLOR and explicit CLICOLOR_FORCE)
+        if (and (not (has-env NO_COLOR)) (not (has-env CLICOLOR_FORCE))) {
+            if (isatty stdout) {
+                set E:CLICOLOR_FORCE = 1
+            }
+        }
+
         # Always use --internal mode for directive support
         _wt_exec --internal $@filtered-args
 

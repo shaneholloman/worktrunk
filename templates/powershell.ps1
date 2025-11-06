@@ -80,6 +80,13 @@ if ((Get-Command wt -ErrorAction SilentlyContinue) -or $env:WORKTRUNK_BIN) {
             $cmd = $script:_WORKTRUNK_CMD
         }
 
+        # Force colors if wrapper's stdout is a TTY (respects NO_COLOR and explicit CLICOLOR_FORCE)
+        if (-not $env:NO_COLOR -and -not $env:CLICOLOR_FORCE) {
+            if ([Console]::IsOutputRedirected -eq $false) {
+                $env:CLICOLOR_FORCE = "1"
+            }
+        }
+
         # Always use --internal mode for directive support
         $exitCode = _wt_exec -Command $cmd --internal @filteredArgs
         return $exitCode

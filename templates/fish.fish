@@ -112,6 +112,13 @@ if type -q {{ cmd_prefix }}; or set -q WORKTRUNK_BIN
             set _WORKTRUNK_CMD ./target/debug/wt
         end
 
+        # Force colors if wrapper's stdout is a TTY (respects NO_COLOR and explicit CLICOLOR_FORCE)
+        if not set -q NO_COLOR; and not set -q CLICOLOR_FORCE
+            if isatty stdout
+                set -x CLICOLOR_FORCE 1
+            end
+        end
+
         # Always use --internal mode for directive support
         _wt_exec --internal $args
 

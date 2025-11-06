@@ -64,6 +64,13 @@ if (which wt | is-not-empty) or ($env.WORKTRUNK_BIN? | is-not-empty) {
             $_WORKTRUNK_CMD
         }
 
+        # Force colors if wrapper's stdout is a TTY (respects NO_COLOR and explicit CLICOLOR_FORCE)
+        if ($env.NO_COLOR? | is-empty) and ($env.CLICOLOR_FORCE? | is-empty) {
+            if (do -i { term size } | is-not-empty) {
+                load-env { CLICOLOR_FORCE: "1" }
+            }
+        }
+
         # Always use --internal mode for directive support
         let internal_args = (["--internal"] | append $filtered_args)
         let exit_code = (_wt_exec $cmd ...$internal_args)

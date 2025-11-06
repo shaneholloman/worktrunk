@@ -62,6 +62,11 @@ if shutil.which("wt") is not None or os.environ.get('WORKTRUNK_BIN'):
         else:
             cmd = _WORKTRUNK_CMD
 
+        # Force colors if wrapper's stdout is a TTY (respects NO_COLOR and explicit CLICOLOR_FORCE)
+        if 'NO_COLOR' not in os.environ and 'CLICOLOR_FORCE' not in os.environ:
+            if sys.stdout.isatty():
+                os.environ['CLICOLOR_FORCE'] = '1'
+
         # Always use --internal mode for directive support
         return _wt_exec(["--internal"] + filtered_args, cmd=cmd)
 

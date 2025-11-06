@@ -81,6 +81,11 @@ if command -v wt >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]]; then
             _WORKTRUNK_CMD="./target/debug/wt"
         fi
 
+        # Force colors if wrapper's stdout is a TTY (respects NO_COLOR and explicit CLICOLOR_FORCE)
+        if [[ -z "${NO_COLOR:-}" && -z "${CLICOLOR_FORCE:-}" ]]; then
+            if [[ -t 1 ]]; then export CLICOLOR_FORCE=1; fi
+        fi
+
         # Always use --internal mode for directive support
         _wt_exec --internal "${args[@]}"
 
