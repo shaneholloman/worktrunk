@@ -15,7 +15,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpZuEIMN/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp0hMTyP/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -257,7 +257,7 @@ complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_f
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from squash" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from push" -l allow-merge-commits -d 'Allow pushing merge commits (non-linear history)'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from push" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from push" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from push" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from rebase" -s v -l verbose -d 'Enable verbose output (show git commands and debug info)'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from rebase" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -s f -l force -d 'Skip command approval prompts'

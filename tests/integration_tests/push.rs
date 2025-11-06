@@ -162,7 +162,86 @@ fn test_push_with_dirty_target() {
         .expect("Failed to commit");
 
     // Try to push (should fail due to conflicting changes)
-    snapshot_push("push_dirty_target", &repo, &["main"], Some(&feature_wt));
+    snapshot_push(
+        "push_dirty_target_overlap",
+        &repo,
+        &["main"],
+        Some(&feature_wt),
+    );
+
+    // Ensure target worktree still has original file content and no stash was created
+    let main_contents =
+        std::fs::read_to_string(repo.root_path().join("conflict.txt")).expect("read conflict file");
+    assert_eq!(main_contents, "old content");
+
+    let mut git_cmd = Command::new("git");
+    repo.configure_git_cmd(&mut git_cmd);
+    let stash_list = git_cmd
+        .args(["stash", "list"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to list stashes");
+    assert!(
+        String::from_utf8_lossy(&stash_list.stdout)
+            .trim()
+            .is_empty()
+    );
+}
+
+#[test]
+fn test_push_dirty_target_autostash() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Make main worktree (repo root) dirty with a non-conflicting file
+    std::fs::write(repo.root_path().join("notes.txt"), "temporary notes")
+        .expect("Failed to write file");
+
+    let feature_wt = repo.add_worktree("feature", "feature");
+    std::fs::write(feature_wt.join("feature.txt"), "feature content")
+        .expect("Failed to write file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "feature.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Add feature file"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Push should succeed by auto-stashing the non-conflicting target changes
+    snapshot_push(
+        "push_dirty_target_autostash",
+        &repo,
+        &["main"],
+        Some(&feature_wt),
+    );
+
+    // Ensure the target worktree content is restored
+    let notes = std::fs::read_to_string(repo.root_path().join("notes.txt"))
+        .expect("read notes file after autostash");
+    assert_eq!(notes, "temporary notes");
+
+    // Autostash should clean up after itself
+    let mut git_cmd = Command::new("git");
+    repo.configure_git_cmd(&mut git_cmd);
+    let stash_list = git_cmd
+        .args(["stash", "list"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to list stashes");
+    assert!(
+        String::from_utf8_lossy(&stash_list.stdout)
+            .trim()
+            .is_empty()
+    );
 }
 
 #[test]

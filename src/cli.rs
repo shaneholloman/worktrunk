@@ -104,6 +104,9 @@ pub enum StandaloneCommand {
     },
 
     /// Push changes to target branch
+    ///
+    /// Automatically stashes non-conflicting edits in the target worktree before
+    /// the push and restores them afterward so other agents' changes stay intact.
     Push {
         /// Target branch (defaults to default branch)
         target: Option<String>,
@@ -384,7 +387,8 @@ The merge operation follows a strict order designed for fail-fast execution:
 
 6. Push to target
    Fast-forward pushes to target branch. Rejects non-fast-forward pushes (ensures
-   linear history).
+   linear history). Temporarily stashes non-conflicting local edits in the target
+   worktree so they don't block the push, then restores them after success.
 
 7. Clean up worktree and branch
    Removes current worktree, deletes the branch, and switches primary worktree to target

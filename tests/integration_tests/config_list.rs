@@ -161,10 +161,10 @@ fn test_config_list_outside_git_repo() {
         success: true
         exit_code: 0
         ----- stdout -----
-        ⚪ Global Config: [1m[TEMP_HOME]/.config/worktrunk/config.toml[0m
-        [40m [0m  worktree-path = [32m"../{main-worktree}.{branch}"[0m
+        ⚪ Global Config: [TEMP_HOME]/.config/worktrunk/config.toml
+           worktree-path = "../{main-worktree}.{branch}"
 
-        ⚪ [2mProject Config: Not in a git repository[0m
+        ⚪ Project Config: Not in a git repository
 
         ----- stderr -----
         "#);
