@@ -251,7 +251,7 @@ pub fn handle_beta_squash(
     if !repo.has_staged_changes()? {
         let dim = AnstyleStyle::new().dimmed();
         crate::output::info(format!(
-            "{dim}No changes after squashing {commit_count} {commit_text} (commits resulted in no net changes){dim:#}"
+            "{dim}No changes after squashing {commit_count} {commit_text}{dim:#}"
         ))?;
         return Ok(false);
     }

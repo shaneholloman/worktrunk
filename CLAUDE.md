@@ -63,6 +63,26 @@ When users provide explicit arguments (flags, options, values), the output shoul
 - Don't just use defaults silently—show what was chosen
 - For optional arguments, conditionally include them in the message
 
+**Avoid redundant parenthesized content:**
+
+Parenthesized text should add new information, not restate what's already said. If the parentheses just rephrase the main message in different words, remove them.
+
+```rust
+// ❌ BAD - parentheses restate "no changes"
+"No changes after squashing 3 commits (commits resulted in no net changes)"
+
+// ✅ GOOD - clear and concise
+"No changes after squashing 3 commits"
+
+// ✅ GOOD - parentheses add supplementary info (stats)
+"Committing with default message... (3 files, +45, -12)"
+
+// ✅ GOOD - parentheses explain why
+"Worktree preserved (--no-remove)"
+```
+
+When reviewing messages, ask: "Does the parenthesized text add information, or just reword what's already clear?"
+
 ### The anstyle Ecosystem
 
 All styling uses the **anstyle ecosystem** for composable, auto-detecting terminal output:
