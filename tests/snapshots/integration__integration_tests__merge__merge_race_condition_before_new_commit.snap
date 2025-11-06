@@ -17,12 +17,12 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpzJjuCV/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpxCmHlV/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-🔄 [36mMerging 1 commit to [1m[36mmain[0m @ [2m[SHA][0m (no commit/squash/rebase needed)
+🔄 [36mMerging 1 commit to [1m[36mmain[0m[36m @ [2m[SHA][0m (no commit/squash/rebase needed)
 
 [40m [0m  * [SHA][33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Add feature file
 [40m [0m   feature.txt | 1 [32m+[m

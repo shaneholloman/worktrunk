@@ -749,7 +749,7 @@ pub fn handle_push(
         };
 
         crate::output::progress(format!(
-            "{CYAN}{verb_ing} {commit_count} {commit_text} to {CYAN_BOLD}{target_branch}{CYAN_BOLD:#} @ {cyan_dim}{head_sha}{cyan_dim:#}{CYAN:#}{operations_note}\n"
+            "{CYAN}{verb_ing} {commit_count} {commit_text} to {CYAN_BOLD}{target_branch}{CYAN_BOLD:#}{CYAN} @ {cyan_dim}{head_sha}{cyan_dim:#}{CYAN:#}{operations_note}\n"
         ))?;
 
         // Show the commit graph with color
