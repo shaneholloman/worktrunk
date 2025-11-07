@@ -12,18 +12,19 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
     WORKTRUNK_COMMIT_GENERATION__ARGS: "fix: commit changes"
     WORKTRUNK_COMMIT_GENERATION__COMMAND: echo
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpBieRmJ/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmptF5zZb/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-🟡 [33mAuto-staging untracked files: untracked1.txt, untracked2.txt[0m
+🟡 [33mAuto-staging 2 untracked files:[0m
+[40m [0m  untracked1.txt
+[40m [0m  untracked2.txt
 🔄 [36mSquashing 1 commit with working tree changes into 1[0m (1 file, [32m+1[0m)...
 🔄 [36mGenerating squash commit message...[0m
 💡 [2mUsing fallback commit message. Run 'wt config help' to configure LLM-generated messages[0m

@@ -85,10 +85,14 @@ pub fn warn_untracked_auto_stage(repo: &Repository) -> Result<(), GitError> {
         return Ok(());
     }
 
-    let file_list = untracked.join(", ");
+    let count = untracked.len();
+    let file_word = if count == 1 { "file" } else { "files" };
     crate::output::warning(format!(
-        "{WARNING}Auto-staging untracked files: {file_list}{WARNING:#}"
+        "{WARNING}Auto-staging {count} untracked {file_word}:{WARNING:#}"
     ))?;
+
+    let joined_files = untracked.join("\n");
+    crate::output::gutter(format_with_gutter(&joined_files, "", None))?;
 
     Ok(())
 }
