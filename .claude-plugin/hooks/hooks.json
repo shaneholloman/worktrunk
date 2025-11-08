@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git branch --show-current 2>/dev/null | xargs -I {} git config worktrunk.status.{} 🤖"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git branch --show-current 2>/dev/null | xargs -I {} git config worktrunk.status.{} 💬"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git branch --show-current 2>/dev/null | xargs -I {} git config --unset worktrunk.status.{} 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
