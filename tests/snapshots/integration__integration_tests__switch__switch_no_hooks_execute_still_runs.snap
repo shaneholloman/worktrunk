@@ -20,17 +20,17 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpunJx6g/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpI4D74J/test-config.toml
 ---
 success: false
 exit_code: 2
 ----- stdout -----
 
 ----- stderr -----
-[1m[31merror:[0m unexpected argument '[33m--no-hooks[0m' found
+[1m[31merror:[0m unexpected argument '[1m[33m--no-hooks[0m' found
 
-  [32mtip:[0m to pass '[33m--no-hooks[0m' as a value, use '[32m-- --no-hooks[0m'
+  [1m[32mtip:[0m to pass '[1m[33m--no-hooks[0m' as a value, use '[1m[32m-- --no-hooks[0m'
 
-[1m[4mUsage:[0m [1mwt switch[0m [1m--create[0m [1m--execute[0m <EXECUTE> <BRANCH>
+[1m[32mUsage:[0m [1m[36mwt switch[0m [1m[36m--create[0m [1m[36m--execute[0m[36m [0m[36m<EXECUTE>[0m [36m<BRANCH>[0m
 
-For more information, try '[1m--help[0m'.
+For more information, try '[1m[36m--help[0m'.

@@ -1,8 +1,45 @@
+use clap::builder::styling::{AnsiColor, Color, Styles};
 use clap::{Parser, Subcommand};
 use std::sync::OnceLock;
 use worktrunk::HookType;
 
 use crate::commands::Shell;
+
+/// Custom styles for help output - matches worktrunk's color scheme
+fn help_styles() -> Styles {
+    Styles::styled()
+        .header(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(Color::Ansi(AnsiColor::Green))),
+        )
+        .usage(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(Color::Ansi(AnsiColor::Green))),
+        )
+        .literal(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
+        )
+        .placeholder(anstyle::Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))))
+        .error(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(Color::Ansi(AnsiColor::Red))),
+        )
+        .valid(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(Color::Ansi(AnsiColor::Green))),
+        )
+        .invalid(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
+        )
+}
 
 /// Default command name for worktrunk
 const DEFAULT_COMMAND_NAME: &str = "wt";
@@ -34,6 +71,7 @@ pub enum OutputFormat {
 #[command(about = "Git worktree management", long_about = None)]
 #[command(version = version_str())]
 #[command(disable_help_subcommand = true)]
+#[command(styles = help_styles())]
 pub struct Cli {
     /// Change working directory
     #[arg(short = 'C', global = true, value_name = "path")]
@@ -291,7 +329,7 @@ Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
     },
 
     /// List worktrees and optionally branches
-    #[command(after_help = r#"COLUMNS:
+    #[command(after_help = "COLUMNS:
   Branch: Branch name
   Status: Quick status symbols (see STATUS SYMBOLS below)
   HEAD±: Uncommitted changes vs HEAD (+added -deleted lines, staged + unstaged)
@@ -300,11 +338,11 @@ Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
   Path: Worktree directory location
   Remote⇅: Commits ahead↑/behind↓ relative to tracking branch (e.g. origin/branch)
   CI (--full): CI pipeline status (tries PR/MR checks first, falls back to branch workflows)
-    ● passed (green) - All checks passed
-    ● running (blue) - Checks in progress
-    ● failed (red) - Checks failed
-    ● conflicts (yellow) - Merge conflicts with base
-    ● no-ci (gray) - PR/MR or workflow found but no checks configured
+    \x1b[32m●\x1b[0m passed (green) - All checks passed
+    \x1b[34m●\x1b[0m running (blue) - Checks in progress
+    \x1b[31m●\x1b[0m failed (red) - Checks failed
+    \x1b[33m●\x1b[0m conflicts (yellow) - Merge conflicts with base
+    \x1b[90m●\x1b[0m no-ci (gray) - PR/MR or workflow found but no checks configured
     (blank) - No PR/MR or workflow found, or gh/glab CLI unavailable
     (dimmed) - Stale: unpushed local changes differ from PR/MR head
   Commit: Short commit hash (8 chars)
@@ -313,7 +351,7 @@ Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
 
 STATUS SYMBOLS (order: = ≡∅ ↻⋈ ◇⊠⚠ ↑↓ ⇡⇣ ?!+»✘):
   ·  Branch without worktree (no working directory to check)
-  =  Merge conflicts (unmerged paths in working tree)
+  \x1b[31m=\x1b[0m  Merge conflicts (unmerged paths OR --full detected conflicts with main)
   ≡  Working tree matches main (identical contents, regardless of commit history)
   ∅  No commits (no commits ahead AND no uncommitted changes)
   ↻  Rebase in progress
@@ -331,7 +369,7 @@ STATUS SYMBOLS (order: = ≡∅ ↻⋈ ◇⊠⚠ ↑↓ ⇡⇣ ?!+»✘):
   »  Renamed files
   ✘  Deleted files
 
-Rows are dimmed when no unique work (≡ matches main OR ∅ no commits)."#)]
+Rows are dimmed when no unique work (≡ matches main OR ∅ no commits).")]
     List {
         /// Output format
         #[arg(long, value_enum, default_value = "table")]
