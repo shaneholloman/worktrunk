@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpcTmZuL/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp7D6YbP/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -56,6 +56,7 @@ exit_code: 0
     "pr_status": null,
     "status_symbols": {
       "has_conflicts": false,
+      "has_potential_conflicts": false,
       "branch_state": "",
       "git_operation": "",
       "worktree_attrs": "",
@@ -99,6 +100,7 @@ exit_code: 0
     "pr_status": null,
     "status_symbols": {
       "has_conflicts": false,
+      "has_potential_conflicts": false,
       "branch_state": "≡",
       "git_operation": "",
       "worktree_attrs": "",
@@ -143,6 +145,7 @@ exit_code: 0
     "pr_status": null,
     "status_symbols": {
       "has_conflicts": false,
+      "has_potential_conflicts": false,
       "branch_state": "≡",
       "git_operation": "",
       "worktree_attrs": "",

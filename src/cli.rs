@@ -349,9 +349,10 @@ Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
   Age: Time since last commit (relative)
   Message: Last commit message (truncated)
 
-STATUS SYMBOLS (order: = ≡∅ ↻⋈ ◇⊠⚠ ↑↓ ⇡⇣ ?!+»✘):
+STATUS SYMBOLS (order: =≠ ≡∅ ↻⋈ ◇⊠⚠ ↑↓ ⇡⇣ ?!+»✘):
   ·  Branch without worktree (no working directory to check)
-  \x1b[31m=\x1b[0m  Merge conflicts (unmerged paths OR --full detected conflicts with main)
+  \x1b[31m=\x1b[0m  Merge conflicts (unmerged paths in working tree)
+  \x1b[33m≠\x1b[0m  Potential conflicts with main (--full only, detected via git merge-tree)
   ≡  Working tree matches main (identical contents, regardless of commit history)
   ∅  No commits (no commits ahead AND no uncommitted changes)
   ↻  Rebase in progress

@@ -609,9 +609,13 @@ impl PositionMask {
 /// - All working tree symbols (?!+»✘): Can have multiple types of changes
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct StatusSymbols {
-    /// Merge conflicts indicator
+    /// Actual merge conflicts in working tree (unmerged paths)
     /// Position 0a - Boolean flag (= or empty)
     pub(crate) has_conflicts: bool,
+
+    /// Potential conflicts with main branch (detected via --full)
+    /// Position 0a2 - Boolean flag (≠ or empty)
+    pub(crate) has_potential_conflicts: bool,
 
     /// Branch state relative to main
     /// Position 0b - MUTUALLY EXCLUSIVE (enforced by enum)
@@ -678,12 +682,15 @@ impl StatusSymbols {
         // Build list of (position_index, content, has_data) tuples
         // Ordered by importance/actionability
         // Apply colors based on semantic meaning:
-        // - Red (ERROR): Conflicts (blocking problems)
-        // - Yellow (WARNING): Git operations, locked/prunable (active/stuck states)
+        // - Red (ERROR): Actual conflicts (blocking problems requiring immediate action)
+        // - Yellow (WARNING): Potential conflicts, git operations, locked/prunable (warnings)
         // - Cyan: Working tree changes (activity)
         // - Dimmed (HINT): Branch state symbols that indicate removability
+        // Conflicts: actual (=) and potential (≠) are mutually exclusive
         let conflicts_str = if self.has_conflicts {
             format!("{ERROR}={ERROR:#}")
+        } else if self.has_potential_conflicts {
+            format!("{WARNING}≠{WARNING:#}")
         } else {
             String::new()
         };
@@ -723,8 +730,12 @@ impl StatusSymbols {
             (
                 PositionMask::POS_0A_CONFLICTS,
                 conflicts_str.as_str(),
-                if self.has_conflicts { 1 } else { 0 },
-                self.has_conflicts,
+                if self.has_conflicts || self.has_potential_conflicts {
+                    1
+                } else {
+                    0
+                },
+                self.has_conflicts || self.has_potential_conflicts,
             ),
             (
                 PositionMask::POS_0C_GIT_OPERATION,
@@ -802,7 +813,12 @@ impl StatusSymbols {
         let mut widths = [0; 8];
 
         widths[PositionMask::POS_3_WORKING_TREE] = self.working_tree.width();
-        widths[PositionMask::POS_0A_CONFLICTS] = if self.has_conflicts { 1 } else { 0 };
+        widths[PositionMask::POS_0A_CONFLICTS] =
+            if self.has_conflicts || self.has_potential_conflicts {
+                1
+            } else {
+                0
+            };
         widths[PositionMask::POS_0C_GIT_OPERATION] = self.git_operation.to_string().width();
         widths[PositionMask::POS_1_MAIN_DIVERGENCE] = self.main_divergence.to_string().width();
         widths[PositionMask::POS_2_UPSTREAM_DIVERGENCE] =
@@ -818,6 +834,7 @@ impl StatusSymbols {
     /// Check if symbols are empty
     pub fn is_empty(&self) -> bool {
         !self.has_conflicts
+            && !self.has_potential_conflicts
             && self.branch_state == BranchState::None
             && self.git_operation == GitOperation::None
             && self.worktree_attrs.is_empty()
@@ -1007,14 +1024,14 @@ impl WorktreeInfo {
         };
 
         // Build complete status symbols with type-safe enums
-        // Order: = ≡∅ ↻⋈ ◇⊠⚠ | ↑↓ | ⇡⇣ | ?!+»✘
+        // Order: =≠ ≡∅ ↻⋈ ◇⊠⚠ | ↑↓ | ⇡⇣ | ?!+»✘
         //        ^0a 0b 0c 0d^  ^1^  ^2^  ^3+^
         let mut symbols = status_info.symbols;
 
-        // Add merge conflicts indicator if this branch has conflicts with base
-        // (different from git status conflicts which are already in has_conflicts)
+        // Add potential conflicts indicator if this branch has conflicts with base (--full only)
+        // This is separate from actual unmerged files which are already in has_conflicts
         if has_conflicts {
-            symbols.has_conflicts = true;
+            symbols.has_potential_conflicts = true;
         }
 
         // Branch state: ≡ matches main, ∅ no commits (mutually exclusive)
