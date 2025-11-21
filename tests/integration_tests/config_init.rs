@@ -1,5 +1,4 @@
-use crate::common::{set_temp_home_env, wt_command};
-use insta::Settings;
+use crate::common::{set_temp_home_env, setup_home_snapshot_settings, wt_command};
 use insta_cmd::assert_cmd_snapshot;
 use std::fs;
 use tempfile::TempDir;
@@ -19,13 +18,7 @@ fn test_config_init_already_exists() {
     )
     .unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-
-    // Filter out the actual config paths
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-    settings.add_filter(r"\\", "/");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         cmd.arg("config").arg("init");
@@ -53,13 +46,7 @@ fn test_config_init_creates_file() {
     let global_config_dir = temp_home.path().join(".config").join("worktrunk");
     fs::create_dir_all(&global_config_dir).unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-
-    // Filter out the actual config paths
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-    settings.add_filter(r"\\", "/");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         cmd.arg("config").arg("init");

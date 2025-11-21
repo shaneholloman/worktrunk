@@ -1,5 +1,4 @@
-use crate::common::{TestRepo, set_temp_home_env, wt_command};
-use insta::Settings;
+use crate::common::{TestRepo, set_temp_home_env, setup_home_snapshot_settings, wt_command};
 use insta_cmd::assert_cmd_snapshot;
 use std::fs;
 use tempfile::TempDir;
@@ -14,10 +13,7 @@ fn test_configure_shell_with_yes() {
     let zshrc_path = temp_home.path().join(".zshrc");
     fs::write(&zshrc_path, "# Existing config\n").unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -57,10 +53,7 @@ fn test_configure_shell_specific_shell() {
     let zshrc_path = temp_home.path().join(".zshrc");
     fs::write(&zshrc_path, "# Existing config\n").unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -106,10 +99,7 @@ fn test_configure_shell_already_exists() {
     )
     .unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -143,10 +133,7 @@ fn test_configure_shell_fish() {
     let repo = TestRepo::new();
     let temp_home = TempDir::new().unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -191,9 +178,7 @@ fn test_configure_shell_no_files() {
     let repo = TestRepo::new();
     let temp_home = TempDir::new().unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
+    let mut settings = setup_home_snapshot_settings(&temp_home);
     // Normalize bash config file names across platforms
     // Linux: ".bashrc, .bash_profile" → remove ".bashrc, "
     // macOS: ".bash_profile, .profile" → remove ", .profile"
@@ -233,10 +218,7 @@ fn test_configure_shell_multiple_configs() {
     fs::write(&bash_config_path, "# Existing bash config\n").unwrap();
     fs::write(&zshrc_path, "# Existing zsh config\n").unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -295,10 +277,7 @@ fn test_configure_shell_mixed_states() {
     let zshrc_path = temp_home.path().join(".zshrc");
     fs::write(&zshrc_path, "# Existing zsh config\n").unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);

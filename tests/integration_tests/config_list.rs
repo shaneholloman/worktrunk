@@ -1,5 +1,7 @@
-use crate::common::{TestRepo, set_temp_home_env, wt_command};
-use insta::Settings;
+use crate::common::{
+    TestRepo, set_temp_home_env, setup_home_snapshot_settings, setup_snapshot_settings_with_home,
+    wt_command,
+};
 use insta_cmd::assert_cmd_snapshot;
 use std::fs;
 use tempfile::TempDir;
@@ -37,15 +39,7 @@ server = "npm run dev"
     )
     .unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-
-    // Filter out the actual config paths to use placeholders
-    settings.add_filter(repo.root_path().to_str().unwrap(), "[REPO]");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-    // Normalize Windows paths to Unix style
-    settings.add_filter(r"\\", "/");
-
+    let settings = setup_snapshot_settings_with_home(&repo, &temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -90,14 +84,7 @@ fn test_config_list_no_project_config() {
     )
     .unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-
-    // Filter out the actual config paths to use placeholders
-    settings.add_filter(repo.root_path().to_str().unwrap(), "[REPO]");
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-    settings.add_filter(r"\\", "/");
-
+    let settings = setup_snapshot_settings_with_home(&repo, &temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
@@ -135,13 +122,7 @@ fn test_config_list_outside_git_repo() {
     )
     .unwrap();
 
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-
-    // Filter out the actual config paths
-    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
-    settings.add_filter(r"\\", "/");
-
+    let settings = setup_home_snapshot_settings(&temp_home);
     settings.bind(|| {
         let mut cmd = wt_command();
         cmd.arg("config").arg("list").current_dir(temp_dir.path());

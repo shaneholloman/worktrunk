@@ -703,6 +703,28 @@ pub fn setup_snapshot_settings(repo: &TestRepo) -> insta::Settings {
     settings
 }
 
+/// Create configured insta Settings for snapshot tests with a temporary home directory
+///
+/// This extends `setup_snapshot_settings` by adding a filter for the temporary home directory.
+/// Use this for tests that need both a TestRepo and a temporary home (for user config testing).
+pub fn setup_snapshot_settings_with_home(repo: &TestRepo, temp_home: &TempDir) -> insta::Settings {
+    let mut settings = setup_snapshot_settings(repo);
+    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
+    settings
+}
+
+/// Create configured insta Settings for snapshot tests with only a temporary home directory
+///
+/// Use this for tests that don't need a TestRepo but do need a temporary home directory
+/// (e.g., shell configuration tests, config init tests).
+pub fn setup_home_snapshot_settings(temp_home: &TempDir) -> insta::Settings {
+    let mut settings = insta::Settings::clone_current();
+    settings.set_snapshot_path("../snapshots");
+    settings.add_filter(&temp_home.path().to_string_lossy(), "[TEMP_HOME]");
+    settings.add_filter(r"\\", "/");
+    settings
+}
+
 /// Create a configured Command for snapshot testing
 ///
 /// This extracts the common command setup while allowing the test file
