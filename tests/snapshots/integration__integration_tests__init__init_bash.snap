@@ -12,16 +12,13 @@ info:
     COLUMNS: "150"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
-    GIT_CONFIG_COUNT: "1"
-    GIT_CONFIG_GLOBAL: /dev/null
-    GIT_CONFIG_KEY_0: advice.mergeConflict
+    GIT_CONFIG_GLOBAL: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpX880pk/test-gitconfig
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_CONFIG_VALUE_0: "false"
     GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpcucFH7/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpX880pk/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -203,12 +200,6 @@ _wt() {
             wt,switch)
                 cmd="wt__switch"
                 ;;
-            wt__beta,ask-approvals)
-                cmd="wt__beta__ask__approvals"
-                ;;
-            wt__beta,clear-approvals)
-                cmd="wt__beta__clear__approvals"
-                ;;
             wt__beta,commit)
                 cmd="wt__beta__commit"
                 ;;
@@ -227,6 +218,9 @@ _wt() {
             wt__beta,squash)
                 cmd="wt__beta__squash"
                 ;;
+            wt__config,approvals)
+                cmd="wt__config__approvals"
+                ;;
             wt__config,create)
                 cmd="wt__config__create"
                 ;;
@@ -241,6 +235,12 @@ _wt() {
                 ;;
             wt__config,status)
                 cmd="wt__config__status"
+                ;;
+            wt__config__approvals,ask)
+                cmd="wt__config__approvals__ask"
+                ;;
+            wt__config__approvals,clear)
+                cmd="wt__config__approvals__clear"
                 ;;
             wt__config__shell,init)
                 cmd="wt__config__shell__init"
@@ -283,52 +283,8 @@ _wt() {
             return 0
             ;;
         wt__beta)
-            opts="-C -v -h --config --verbose --help run-hook commit squash push rebase ask-approvals clear-approvals select"
+            opts="-C -v -h --config --verbose --help run-hook commit squash push rebase select"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
-                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-                return 0
-            fi
-            case "${prev}" in
-                -C)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --config)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
-            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-            return 0
-            ;;
-        wt__beta__ask__approvals)
-            opts="-f -C -v -h --force --all --config --verbose --help"
-            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
-                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-                return 0
-            fi
-            case "${prev}" in
-                -C)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --config)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
-            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-            return 0
-            ;;
-        wt__beta__clear__approvals)
-            opts="-g -C -v -h --global --config --verbose --help"
-            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -481,8 +437,74 @@ _wt() {
             return 0
             ;;
         wt__config)
-            opts="-C -v -h --config --verbose --help shell create list refresh-cache status"
+            opts="-C -v -h --config --verbose --help shell create list refresh-cache status approvals"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        wt__config__approvals)
+            opts="-C -v -h --config --verbose --help ask clear"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        wt__config__approvals__ask)
+            opts="-f -C -v -h --force --all --config --verbose --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        wt__config__approvals__clear)
+            opts="-g -C -v -h --global --config --verbose --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi

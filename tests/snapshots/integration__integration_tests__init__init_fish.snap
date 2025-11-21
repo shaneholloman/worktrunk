@@ -12,16 +12,13 @@ info:
     COLUMNS: "150"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
-    GIT_CONFIG_COUNT: "1"
-    GIT_CONFIG_GLOBAL: /dev/null
-    GIT_CONFIG_KEY_0: advice.mergeConflict
+    GIT_CONFIG_GLOBAL: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpIGoCm6/test-gitconfig
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_CONFIG_VALUE_0: "false"
     GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpmHNUsf/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpIGoCm6/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -200,15 +197,16 @@ complete -c wt -n "__fish_wt_needs_command" -f -a "list" -d 'List worktrees and 
 complete -c wt -n "__fish_wt_needs_command" -f -a "switch" -d 'Switch to a worktree'
 complete -c wt -n "__fish_wt_needs_command" -f -a "remove" -d 'Remove worktree and branch'
 complete -c wt -n "__fish_wt_needs_command" -f -a "merge" -d 'Merge worktree into target branch'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -s C -d 'Change working directory' -r -F
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -l config -d 'User config file path' -r -F
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -s v -l verbose -d 'Show commands and debug info'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -s h -l help -d 'Print help (see more with \'--help\')'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -f -a "shell" -d 'Shell integration setup'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -f -a "create" -d 'Create global configuration file'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -f -a "list" -d 'List configuration files & locations'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -f -a "refresh-cache" -d 'Refresh default branch from remote'
-complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status" -f -a "status" -d 'Manage branch status markers'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -s C -d 'Change working directory' -r -F
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -l config -d 'User config file path' -r -F
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -s v -l verbose -d 'Show commands and debug info'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -f -a "shell" -d 'Shell integration setup'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -f -a "create" -d 'Create global configuration file'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -f -a "list" -d 'List configuration files & locations'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -f -a "refresh-cache" -d 'Refresh default branch from remote'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -f -a "status" -d 'Manage branch status markers'
+complete -c wt -n "__fish_wt_using_subcommand config; and not __fish_seen_subcommand_from shell create list refresh-cache status approvals" -f -a "approvals" -d 'Manage command approvals'
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from shell" -s C -d 'Change working directory' -r -F
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from shell" -l config -d 'User config file path' -r -F
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from shell" -s v -l verbose -d 'Show commands and debug info'
@@ -233,18 +231,22 @@ complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from status" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from status" -f -a "set" -d 'Set status emoji for branch'
 complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from status" -f -a "unset" -d 'Clear status emoji'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -s C -d 'Change working directory' -r -F
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -l config -d 'User config file path' -r -F
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -s v -l verbose -d 'Show commands and debug info'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "run-hook" -d 'Run project hook'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "commit" -d 'Commit changes with LLM-generated message'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "squash" -d 'Squash commits with LLM-generated message'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "push" -d 'Push changes to local target branch'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "rebase" -d 'Rebase onto target'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "ask-approvals" -d 'Store approvals in config'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "clear-approvals" -d 'Clear approved commands from config'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase ask-approvals clear-approvals select" -f -a "select" -d 'Interactive worktree selector'
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from approvals" -s C -d 'Change working directory' -r -F
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from approvals" -l config -d 'User config file path' -r -F
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from approvals" -s v -l verbose -d 'Show commands and debug info'
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from approvals" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from approvals" -f -a "ask" -d 'Store approvals in config'
+complete -c wt -n "__fish_wt_using_subcommand config; and __fish_seen_subcommand_from approvals" -f -a "clear" -d 'Clear approved commands from config'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -s C -d 'Change working directory' -r -F
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -l config -d 'User config file path' -r -F
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -s v -l verbose -d 'Show commands and debug info'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "run-hook" -d 'Run project hook'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "commit" -d 'Commit changes with LLM-generated message'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "squash" -d 'Squash commits with LLM-generated message'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "push" -d 'Push changes to local target branch'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "rebase" -d 'Rebase onto target'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "select" -d 'Interactive worktree selector'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from run-hook" -s C -d 'Change working directory' -r -F
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from run-hook" -l config -d 'User config file path' -r -F
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from run-hook" -s f -l force -d 'Skip approval prompts'
@@ -271,17 +273,6 @@ complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_f
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from rebase" -l config -d 'User config file path' -r -F
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from rebase" -s v -l verbose -d 'Show commands and debug info'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from rebase" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -s C -d 'Change working directory' -r -F
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -l config -d 'User config file path' -r -F
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -s f -l force -d 'Skip approval prompts'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -l all -d 'Show all commands'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -s v -l verbose -d 'Show commands and debug info'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from ask-approvals" -s h -l help -d 'Print help'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from clear-approvals" -s C -d 'Change working directory' -r -F
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from clear-approvals" -l config -d 'User config file path' -r -F
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from clear-approvals" -s g -l global -d 'Clear global approvals'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from clear-approvals" -s v -l verbose -d 'Show commands and debug info'
-complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from clear-approvals" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from select" -s C -d 'Change working directory' -r -F
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from select" -l config -d 'User config file path' -r -F
 complete -c wt -n "__fish_wt_using_subcommand beta; and __fish_seen_subcommand_from select" -s v -l verbose -d 'Show commands and debug info'

@@ -12,16 +12,13 @@ info:
     COLUMNS: "150"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
-    GIT_CONFIG_COUNT: "1"
-    GIT_CONFIG_GLOBAL: /dev/null
-    GIT_CONFIG_KEY_0: advice.mergeConflict
+    GIT_CONFIG_GLOBAL: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpWiQOW2/test-gitconfig
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_CONFIG_VALUE_0: "false"
     GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpOTBJGU/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpWiQOW2/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -344,6 +341,53 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(approvals)
+_arguments "${_arguments_options[@]}" : \
+'-C+[Change working directory]:path:_files' \
+'--config=[User config file path]:path:_files' \
+'-v[Show commands and debug info]' \
+'--verbose[Show commands and debug info]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_wt__config__approvals_commands" \
+"*::: :->approvals" \
+&& ret=0
+
+    case $state in
+    (approvals)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:wt-config-approvals-command-$line[1]:"
+        case $line[1] in
+            (ask)
+_arguments "${_arguments_options[@]}" : \
+'-C+[Change working directory]:path:_files' \
+'--config=[User config file path]:path:_files' \
+'-f[Skip approval prompts]' \
+'--force[Skip approval prompts]' \
+'--all[Show all commands]' \
+'-v[Show commands and debug info]' \
+'--verbose[Show commands and debug info]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(clear)
+_arguments "${_arguments_options[@]}" : \
+'-C+[Change working directory]:path:_files' \
+'--config=[User config file path]:path:_files' \
+'-g[Clear global approvals]' \
+'--global[Clear global approvals]' \
+'-v[Show commands and debug info]' \
+'--verbose[Show commands and debug info]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
         esac
     ;;
 esac
@@ -427,31 +471,6 @@ _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
 '--help[Print help]' \
 '::target -- Target branch (defaults to default branch):_default' \
-&& ret=0
-;;
-(ask-approvals)
-_arguments "${_arguments_options[@]}" : \
-'-C+[Change working directory]:path:_files' \
-'--config=[User config file path]:path:_files' \
-'-f[Skip approval prompts]' \
-'--force[Skip approval prompts]' \
-'--all[Show all commands]' \
-'-v[Show commands and debug info]' \
-'--verbose[Show commands and debug info]' \
-'-h[Print help]' \
-'--help[Print help]' \
-&& ret=0
-;;
-(clear-approvals)
-_arguments "${_arguments_options[@]}" : \
-'-C+[Change working directory]:path:_files' \
-'--config=[User config file path]:path:_files' \
-'-g[Clear global approvals]' \
-'--global[Clear global approvals]' \
-'-v[Show commands and debug info]' \
-'--verbose[Show commands and debug info]' \
-'-h[Print help]' \
-'--help[Print help]' \
 && ret=0
 ;;
 (select)
@@ -563,21 +582,9 @@ _wt__beta_commands() {
 'squash:Squash commits with LLM-generated message' \
 'push:Push changes to local target branch' \
 'rebase:Rebase onto target' \
-'ask-approvals:Store approvals in config' \
-'clear-approvals:Clear approved commands from config' \
 'select:Interactive worktree selector' \
     )
     _describe -t commands 'wt beta commands' commands "$@"
-}
-(( $+functions[_wt__beta__ask-approvals_commands] )) ||
-_wt__beta__ask-approvals_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt beta ask-approvals commands' commands "$@"
-}
-(( $+functions[_wt__beta__clear-approvals_commands] )) ||
-_wt__beta__clear-approvals_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt beta clear-approvals commands' commands "$@"
 }
 (( $+functions[_wt__beta__commit_commands] )) ||
 _wt__beta__commit_commands() {
@@ -617,8 +624,27 @@ _wt__config_commands() {
 'list:List configuration files & locations' \
 'refresh-cache:Refresh default branch from remote' \
 'status:Manage branch status markers' \
+'approvals:Manage command approvals' \
     )
     _describe -t commands 'wt config commands' commands "$@"
+}
+(( $+functions[_wt__config__approvals_commands] )) ||
+_wt__config__approvals_commands() {
+    local commands; commands=(
+'ask:Store approvals in config' \
+'clear:Clear approved commands from config' \
+    )
+    _describe -t commands 'wt config approvals commands' commands "$@"
+}
+(( $+functions[_wt__config__approvals__ask_commands] )) ||
+_wt__config__approvals__ask_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt config approvals ask commands' commands "$@"
+}
+(( $+functions[_wt__config__approvals__clear_commands] )) ||
+_wt__config__approvals__clear_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt config approvals clear commands' commands "$@"
 }
 (( $+functions[_wt__config__create_commands] )) ||
 _wt__config__create_commands() {
