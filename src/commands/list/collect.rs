@@ -57,11 +57,12 @@ pub(super) enum CellUpdate {
         /// Symbols for uncommitted changes (?, !, +, », ✘)
         working_tree_symbols: String,
         is_dirty: bool,
-    },
-    /// Merge conflicts with main
-    Conflicts {
-        item_idx: usize,
         has_conflicts: bool,
+    },
+    /// Potential merge conflicts with main (merge-tree simulation)
+    MergeTreeConflicts {
+        item_idx: usize,
+        has_merge_tree_conflicts: bool,
     },
     /// Git operation in progress (rebase/merge)
     WorktreeState {
@@ -93,7 +94,7 @@ impl CellUpdate {
             | CellUpdate::AheadBehind { item_idx, .. }
             | CellUpdate::BranchDiff { item_idx, .. }
             | CellUpdate::WorkingTreeDiff { item_idx, .. }
-            | CellUpdate::Conflicts { item_idx, .. }
+            | CellUpdate::MergeTreeConflicts { item_idx, .. }
             | CellUpdate::WorktreeState { item_idx, .. }
             | CellUpdate::UserStatus { item_idx, .. }
             | CellUpdate::Upstream { item_idx, .. }
@@ -211,7 +212,7 @@ fn determine_worktree_branch_state(
 fn compute_item_status_symbols(
     item: &mut ListItem,
     base_branch: Option<&str>,
-    has_conflicts: bool,
+    has_merge_tree_conflicts: bool,
     user_status: Option<String>,
 ) {
     // Common fields for both worktrees and branches
@@ -252,11 +253,12 @@ fn compute_item_status_symbols(
             };
 
             // Combine conflicts and branch state (mutually exclusive)
+            let has_conflicts = data.has_conflicts.unwrap_or(false);
             let branch_state = if has_conflicts {
                 BranchState::Conflicts
+            } else if has_merge_tree_conflicts {
+                BranchState::MergeTreeConflicts
             } else {
-                // has_potential_conflicts is always false currently (--full not implemented)
-                // but when implemented, it would go here as: else if has_potential_conflicts { PotentialConflicts }
                 branch_state
             };
 
@@ -282,10 +284,14 @@ fn compute_item_status_symbols(
 
             // Branch state - branches can only show Conflicts or NoCommits
             // (MatchesMain only applies to worktrees since branches don't have working trees)
-            let branch_state = if has_conflicts {
-                BranchState::Conflicts
-            } else if counts.ahead == 0 {
-                BranchState::NoCommits
+            let branch_state = if has_merge_tree_conflicts {
+                BranchState::MergeTreeConflicts
+            } else if let Some(ref c) = item.counts {
+                if c.ahead == 0 {
+                    BranchState::NoCommits
+                } else {
+                    BranchState::None
+                }
             } else {
                 BranchState::None
             };
@@ -317,7 +323,7 @@ fn drain_cell_updates(
     mut on_update: impl FnMut(usize, &mut ListItem, bool, Option<String>),
 ) {
     // Temporary storage for data needed by status_symbols computation
-    let mut has_conflicts_map: Vec<Option<bool>> = vec![None; worktree_items.len()];
+    let mut merge_tree_conflicts_map: Vec<Option<bool>> = vec![None; worktree_items.len()];
     let mut user_status_map: Vec<Option<Option<String>>> = vec![None; worktree_items.len()];
 
     // Process cell updates as they arrive
@@ -343,20 +349,22 @@ fn drain_cell_updates(
                 working_tree_diff_with_main,
                 working_tree_symbols,
                 is_dirty,
+                has_conflicts,
             } => {
                 if let ItemKind::Worktree(data) = &mut worktree_items[item_idx].kind {
                     data.working_tree_diff = Some(working_tree_diff);
                     data.working_tree_diff_with_main = Some(working_tree_diff_with_main);
                     data.working_tree_symbols = Some(working_tree_symbols);
                     data.is_dirty = Some(is_dirty);
+                    data.has_conflicts = Some(has_conflicts);
                 }
             }
-            CellUpdate::Conflicts {
+            CellUpdate::MergeTreeConflicts {
                 item_idx,
-                has_conflicts,
+                has_merge_tree_conflicts,
             } => {
                 // Store temporarily for status_symbols computation
-                has_conflicts_map[item_idx] = Some(has_conflicts);
+                merge_tree_conflicts_map[item_idx] = Some(has_merge_tree_conflicts);
             }
             CellUpdate::WorktreeState {
                 item_idx,
@@ -386,12 +394,12 @@ fn drain_cell_updates(
         }
 
         // Invoke rendering callback (progressive mode re-renders rows, buffered mode does nothing)
-        let has_conflicts = has_conflicts_map[item_idx].unwrap_or(false);
+        let has_merge_tree_conflicts = merge_tree_conflicts_map[item_idx].unwrap_or(false);
         let user_status = user_status_map[item_idx].clone().unwrap_or(None);
         on_update(
             item_idx,
             &mut worktree_items[item_idx],
-            has_conflicts,
+            has_merge_tree_conflicts,
             user_status,
         );
     }
@@ -433,7 +441,7 @@ pub fn collect(
     show_branches: bool,
     show_full: bool,
     fetch_ci: bool,
-    check_conflicts: bool,
+    check_merge_tree_conflicts: bool,
     show_progress: bool,
     render_table: bool,
 ) -> Result<Option<super::model::ListData>, GitError> {
@@ -626,7 +634,7 @@ pub fn collect(
     // Create collection options
     let options = super::collect_progressive_impl::CollectOptions {
         fetch_ci,
-        check_conflicts,
+        check_merge_tree_conflicts,
     };
 
     // Spawn worktree collection in background thread
@@ -685,7 +693,7 @@ pub fn collect(
     drain_cell_updates(
         rx,
         &mut all_items,
-        |item_idx, info, has_conflicts, user_status| {
+        |item_idx, info, has_merge_tree_conflicts, user_status| {
             // Compute/recompute status symbols as data arrives (both modes)
             // This is idempotent and updates status as new data (like upstream) arrives
             let item_base_branch = if info.is_primary() {
@@ -693,7 +701,12 @@ pub fn collect(
             } else {
                 Some(base_branch.as_str())
             };
-            compute_item_status_symbols(info, item_base_branch, has_conflicts, user_status);
+            compute_item_status_symbols(
+                info,
+                item_base_branch,
+                has_merge_tree_conflicts,
+                user_status,
+            );
 
             // Progressive mode only: update UI
             if show_progress {

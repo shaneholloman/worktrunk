@@ -82,6 +82,9 @@ pub struct WorktreeData {
     /// is_dirty flag - used for status computation, not serialized
     #[serde(skip)]
     pub(crate) is_dirty: Option<bool>,
+    /// Unresolved paths present in working tree (merge or rebase conflicts)
+    #[serde(skip)]
+    pub(crate) has_conflicts: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_diff_display: Option<String>,
 }
@@ -352,7 +355,7 @@ impl serde::Serialize for UpstreamDivergence {
 /// Branch state including conflicts
 ///
 /// These states are mutually exclusive:
-/// - Conflicts (= or ≠) indicate changes that differ from main
+/// - Conflicts (✖ or ⚠) indicate changes that conflict with main
 /// - MatchesMain (≡) means identical to main (can't have conflicts)
 /// - NoCommits (∅) means nothing ahead of main (can't conflict)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
@@ -363,13 +366,11 @@ pub enum BranchState {
     #[serde(rename = "")]
     None,
     /// Actual merge conflicts with main (unmerged paths in working tree)
-    #[serde(rename = "=")]
+    #[serde(rename = "✖")]
     Conflicts,
-    /// Potential conflicts with main (detected via --full, using git merge-tree)
-    /// TODO: Implement when --full mode is complete
-    #[allow(dead_code)]
-    #[serde(rename = "≠")]
-    PotentialConflicts,
+    /// Merge-tree conflicts with main (simulated via git merge-tree)
+    #[serde(rename = "⚠")]
+    MergeTreeConflicts,
     /// Working tree identical to main branch
     #[serde(rename = "≡")]
     MatchesMain,
@@ -382,8 +383,8 @@ impl std::fmt::Display for BranchState {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::None => Ok(()),
-            Self::Conflicts => write!(f, "="),
-            Self::PotentialConflicts => write!(f, "≠"),
+            Self::Conflicts => write!(f, "✖"),
+            Self::MergeTreeConflicts => write!(f, "⚠"),
             Self::MatchesMain => write!(f, "≡"),
             Self::NoCommits => write!(f, "∅"),
         }
@@ -453,7 +454,7 @@ impl PositionMask {
     pub const FULL: Self = Self {
         widths: [
             5, // POS_3_WORKING_TREE: ?!+»✘ (max 5 symbols)
-            1, // POS_0A_BRANCH_STATE: =≠≡∅ (1 char, mutually exclusive)
+            1, // POS_0A_BRANCH_STATE: ✖⚠≡∅ (1 char, mutually exclusive)
             1, // POS_0C_GIT_OPERATION: ↻ or ⋈ (1 char)
             1, // POS_1_MAIN_DIVERGENCE: ↑, ↓, ↕ (1 char)
             1, // POS_2_UPSTREAM_DIVERGENCE: ⇡, ⇣, ⇅ (1 char)
@@ -471,7 +472,7 @@ impl PositionMask {
 /// Structured status symbols for aligned rendering
 ///
 /// Symbols are categorized to enable vertical alignment in table output:
-/// - Position 0a: Conflicts or branch state (=, ≠, ≡, ∅) - mutually exclusive
+/// - Position 0a: Conflicts or branch state (✖, ⚠, ≡, ∅) - mutually exclusive
 /// - Position 0c: Git operation (↻, ⋈)
 /// - Position 0d: Item attributes (⎇ for branches, ⌫⊠ for worktrees - priority-only)
 /// - Position 1: Main branch divergence (↑, ↓, ↕)
@@ -482,7 +483,7 @@ impl PositionMask {
 /// ## Mutual Exclusivity
 ///
 /// **Mutually exclusive (enforced by type system):**
-/// - = vs ≠ vs ≡ vs ∅: BranchState enum (combined position)
+/// - ✖ vs ⚠ vs ≡ vs ∅: BranchState enum (combined position)
 /// - ↻ vs ⋈: Git operation (GitOperation enum)
 /// - ↑ vs ↓ vs ↕: Main divergence (MainDivergence enum)
 /// - ⇡ vs ⇣ vs ⇅: Upstream divergence (UpstreamDivergence enum)
@@ -497,7 +498,7 @@ impl PositionMask {
 pub struct StatusSymbols {
     /// Branch state including conflicts (mutually exclusive)
     /// Position 0a - BranchState enum
-    /// Priority: Conflicts (=) > PotentialConflicts (≠) > MatchesMain (≡) > NoCommits (∅)
+    /// Priority: Conflicts (✖) > MergeTreeConflicts (⚠) > MatchesMain (≡) > NoCommits (∅)
     pub(crate) branch_state: BranchState,
 
     /// Git operation in progress
@@ -546,7 +547,7 @@ impl StatusSymbols {
     ///
     /// Aligns all symbol types at fixed positions, but only includes positions
     /// that are present in the mask:
-    /// - Position 0a: Conflicts or branch state (=, ≠, ≡, ∅)
+    /// - Position 0a: Conflicts or branch state (✖, ⚠, ≡, ∅)
     /// - Position 0c: Git operation (↻, ⋈, or space)
     /// - Position 0d: Worktree attributes (⊠⚠ or space)
     /// - Position 1: Main divergence (↑, ↓, ↕, or space)
@@ -574,8 +575,8 @@ impl StatusSymbols {
         // - Cyan: Working tree changes (activity)
         // - Dimmed (HINT): Branch state symbols that indicate removability + divergence arrows (low urgency)
         let branch_state_str = match self.branch_state {
-            BranchState::Conflicts => format!("{ERROR}={ERROR:#}"),
-            BranchState::PotentialConflicts => format!("{WARNING}≠{WARNING:#}"),
+            BranchState::Conflicts => format!("{ERROR}✖{ERROR:#}"),
+            BranchState::MergeTreeConflicts => format!("{WARNING}⚠{WARNING:#}"),
             BranchState::MatchesMain => format!("{HINT}≡{HINT:#}"),
             BranchState::NoCommits => format!("{HINT}∅{HINT:#}"),
             BranchState::None => String::new(),
@@ -772,7 +773,7 @@ impl serde::Serialize for StatusSymbols {
         let branch_state_variant = match self.branch_state {
             BranchState::None => "",
             BranchState::Conflicts => "Conflicts",
-            BranchState::PotentialConflicts => "PotentialConflicts",
+            BranchState::MergeTreeConflicts => "MergeTreeConflicts",
             BranchState::MatchesMain => "MatchesMain",
             BranchState::NoCommits => "NoCommits",
         };

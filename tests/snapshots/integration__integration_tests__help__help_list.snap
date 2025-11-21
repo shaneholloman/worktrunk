@@ -1,5 +1,6 @@
 ---
 source: tests/integration_tests/help.rs
+assertion_line: 16
 info:
   program: wt
   args:
@@ -85,15 +86,16 @@ branch workflows)
 
 [38;5;10mSTATUS SYMBOLS[39m
 
-Order: ?!+»✘ =≠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠
+Order: ?!+»✘ ✖⚠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠
 
 - [36m?[0m Untracked files present
 - [36m![0m Modified files (unstaged changes)
 - [36m+[0m Staged files (ready to commit)
 - [36m»[0m Renamed files
 - [36m✘[0m Deleted files
-- [31m=[0m Merge conflicts (unmerged paths in working tree)
-- [33m≠[0m Potential conflicts with main (--full only, detected via git merge-tree)
+- [31m✖[0m Merge conflicts - unresolved conflicts in working tree (fix before 
+continuing)
+- [33m⚠[0m Would conflict - merging into main would fail
 - [2m≡[0m Working tree matches main (identical contents, regardless of commit history)
 - [2m∅[0m No commits (no commits ahead AND no uncommitted changes)
 - [33m↻[0m Rebase in progress
@@ -115,7 +117,7 @@ Rows are dimmed when no unique work (≡ matches main OR ∅ no commits).
 Use --format=json for structured data. Each object contains two status maps:
 
 status (variant names for querying):
-- branch_state: "" | "Conflicts" | "PotentialConflicts" | "MatchesMain" | 
+- branch_state: "" | "Conflicts" | "MergeTreeConflicts" | "MatchesMain" | 
 "NoCommits"
 - git_operation: "" | "Rebase" | "Merge"
 - worktree_attrs: object (worktrees only) with:
@@ -132,7 +134,7 @@ status (variant names for querying):
 - user_status: string (optional) - custom status from git config
 
 status_symbols (display symbols for rendering):
-- branch_state: "" | "=" | "≠" | "≡" | "∅"
+- branch_state: "" | "✖" | "⚠" | "≡" | "∅"
 - git_operation: "" | "↻" | "⋈"
 - worktree_attrs: "⎇" (branch) | "⌫" (prunable) | "⊠" (locked) | ""
 - main_divergence: "" | "↑" | "↓" | "↕"

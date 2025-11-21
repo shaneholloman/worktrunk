@@ -38,14 +38,14 @@ fn colorize_status_circles(text: &str) -> String {
         .replace("● failed", &format!("{error}●{error:#} failed"))
         .replace("● conflicts", &format!("{warning}●{warning:#} conflicts"))
         .replace("● no-ci", &format!("{gray}●{gray:#} no-ci"))
-        // Conflicts: = is ERROR (red), ≠ is WARNING (yellow)
+        // Conflicts: ✖ is ERROR (red), ⚠ is WARNING (yellow)
         .replace(
-            "= Merge conflicts",
-            &format!("{error}={error:#} Merge conflicts"),
+            "✖ Merge conflicts",
+            &format!("{error}✖{error:#} Merge conflicts"),
         )
         .replace(
-            "≠ Potential conflicts",
-            &format!("{warning}≠{warning:#} Potential conflicts"),
+            "⚠ Would conflict",
+            &format!("{warning}⚠{warning:#} Would conflict"),
         )
         // Git operations: WARNING (yellow)
         .replace("↻ Rebase", &format!("{warning}↻{warning:#} Rebase"))

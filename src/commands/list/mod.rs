@@ -100,7 +100,7 @@ pub fn handle_list(
     let repo = Repository::current();
 
     let fetch_ci = show_full; // Only fetch CI with --full (expensive)
-    let check_conflicts = show_full; // Only check conflicts with --full (expensive)
+    let check_merge_tree_conflicts = show_full; // Only check conflicts with --full (expensive)
 
     // Progressive rendering only for table format with Progressive mode
     let show_progress = match format {
@@ -116,7 +116,7 @@ pub fn handle_list(
         show_branches,
         show_full,
         fetch_ci,
-        check_conflicts,
+        check_merge_tree_conflicts,
         show_progress,
         render_table,
     )?;

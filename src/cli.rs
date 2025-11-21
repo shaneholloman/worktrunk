@@ -402,15 +402,15 @@ Displays worktrees in a table format with status information, commit details, an
 
 ## STATUS SYMBOLS
 
-Order: `?!+»✘ =≠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
+Order: `?!+»✘ ✖⚠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
 
 - `?` Untracked files present
 - `!` Modified files (unstaged changes)
 - `+` Staged files (ready to commit)
 - `»` Renamed files
 - `✘` Deleted files
-- `=` **Merge conflicts** (unmerged paths in working tree)
-- `≠` **Potential conflicts** with main (`--full` only, detected via `git merge-tree`)
+- `✖` **Merge conflicts** - unresolved conflicts in working tree (fix before continuing)
+- `⚠` **Would conflict** - merging into main would fail
 - `≡` Working tree matches main (identical contents, regardless of commit history)
 - `∅` No commits (no commits ahead AND no uncommitted changes)
 - `↻` Rebase in progress
@@ -432,7 +432,7 @@ Order: `?!+»✘ =≠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
 Use `--format=json` for structured data. Each object contains two status maps:
 
 **`status` (variant names for querying):**
-- `branch_state`: \"\" | \"Conflicts\" | \"PotentialConflicts\" | \"MatchesMain\" | \"NoCommits\"
+- `branch_state`: \"\" | \"Conflicts\" | \"MergeTreeConflicts\" | \"MatchesMain\" | \"NoCommits\"
 - `git_operation`: \"\" | \"Rebase\" | \"Merge\"
 - `worktree_attrs`: object (worktrees only) with:
   - `locked`: null | \"reason string\"
@@ -448,7 +448,7 @@ Use `--format=json` for structured data. Each object contains two status maps:
 - `user_status`: string (optional) - custom status from git config
 
 **`status_symbols` (display symbols for rendering):**
-- `branch_state`: \"\" | \"=\" | \"≠\" | \"≡\" | \"∅\"
+- `branch_state`: \"\" | \"✖\" | \"⚠\" | \"≡\" | \"∅\"
 - `git_operation`: \"\" | \"↻\" | \"⋈\"
 - `worktree_attrs`: \"⎇\" (branch) | \"⌫\" (prunable) | \"⊠\" (locked) | \"\"
 - `main_divergence`: \"\" | \"↑\" | \"↓\" | \"↕\"

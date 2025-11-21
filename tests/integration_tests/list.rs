@@ -1580,8 +1580,8 @@ fn test_list_maximum_status_with_git_operation() {
 #[test]
 fn test_list_maximum_status_symbols() {
     // Test the maximum status symbols possible:
-    // ?!+»✘ (5) + = (1) + ⊠ (1) + ↕ (1) + ⇅ (1) + 🤖 (2) = 11 chars
-    // Missing: ↻ (git operation - can't have with divergence), ◇ (bare), ⚠ (prunable)
+    // ?!+»✘ (5) + ⚠ (1) + ⊠ (1) + ↕ (1) + ⇅ (1) + 🤖 (2) = 11 chars
+    // Missing: ✖ (actual conflicts), ↻ (git operation - can't have with divergence), ◇ (bare), ⚠ (prunable)
     let mut repo = TestRepo::new();
 
     // Create initial commit on main with shared files

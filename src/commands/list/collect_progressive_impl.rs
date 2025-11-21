@@ -22,7 +22,7 @@ use super::model::{AheadBehind, BranchDiffTotals, CommitDetails, UpstreamStatus}
 #[derive(Clone, Copy)]
 pub struct CollectOptions {
     pub fetch_ci: bool,
-    pub check_conflicts: bool,
+    pub check_merge_tree_conflicts: bool,
 }
 
 /// Context for spawning parallel tasks.
@@ -122,7 +122,8 @@ fn spawn_working_tree_diff<'scope>(
         // TODO: Handle errors
         if let Ok(status_output) = repo.run_command(&["status", "--porcelain"]) {
             // Parse status to get symbols and is_dirty
-            let (working_tree_symbols, is_dirty) = parse_status_for_symbols(&status_output);
+            let (working_tree_symbols, is_dirty, has_conflicts) =
+                parse_status_for_symbols(&status_output);
 
             // Get working tree diff
             let working_tree_diff = if is_dirty {
@@ -143,38 +144,39 @@ fn spawn_working_tree_diff<'scope>(
                 working_tree_diff_with_main,
                 working_tree_symbols,
                 is_dirty,
+                has_conflicts,
             });
         }
     });
 }
 
-/// Spawn task 5: Conflicts check
-fn spawn_conflicts<'scope>(
+/// Spawn task 5: Potential conflicts check (merge-tree vs main)
+fn spawn_merge_tree_conflicts<'scope>(
     s: &'scope std::thread::Scope<'scope, '_>,
     ctx: &TaskContext,
-    check_conflicts: bool,
+    check_merge_tree_conflicts: bool,
     send_default_on_skip: bool,
     tx: Sender<CellUpdate>,
 ) {
     let item_idx = ctx.item_idx;
-    if check_conflicts && let Some(base) = ctx.base_branch.as_deref() {
+    if check_merge_tree_conflicts && let Some(base) = ctx.base_branch.as_deref() {
         let sha = ctx.commit_sha.clone();
         let path = ctx.repo_path.clone();
         let base = base.to_string();
         s.spawn(move || {
             let repo = Repository::at(&path);
             // TODO: Handle errors
-            let has_conflicts = repo.has_merge_conflicts(&base, &sha).unwrap_or(false);
-            let _ = tx.send(CellUpdate::Conflicts {
+            let has_merge_tree_conflicts = repo.has_merge_conflicts(&base, &sha).unwrap_or(false);
+            let _ = tx.send(CellUpdate::MergeTreeConflicts {
                 item_idx,
-                has_conflicts,
+                has_merge_tree_conflicts,
             });
         });
     } else if send_default_on_skip {
         // Send default value when not checking conflicts (worktree behavior)
-        let _ = tx.send(CellUpdate::Conflicts {
+        let _ = tx.send(CellUpdate::MergeTreeConflicts {
             item_idx,
-            has_conflicts: false,
+            has_merge_tree_conflicts: false,
         });
     }
     // Branch behavior: don't send anything when not checking
@@ -337,7 +339,13 @@ pub fn collect_worktree_progressive(
         spawn_ahead_behind(s, &ctx, tx.clone());
         spawn_branch_diff(s, &ctx, tx.clone());
         spawn_working_tree_diff(s, &ctx, tx.clone());
-        spawn_conflicts(s, &ctx, options.check_conflicts, true, tx.clone());
+        spawn_merge_tree_conflicts(
+            s,
+            &ctx,
+            options.check_merge_tree_conflicts,
+            true,
+            tx.clone(),
+        );
         spawn_worktree_state(s, &ctx, tx.clone());
         spawn_user_status(s, &ctx, tx.clone());
         spawn_upstream(s, &ctx, true, tx.clone());
@@ -345,14 +353,15 @@ pub fn collect_worktree_progressive(
     });
 }
 
-/// Parse git status output to extract working tree symbols.
-/// Returns (symbols, is_dirty).
-fn parse_status_for_symbols(status_output: &str) -> (String, bool) {
+/// Parse git status output to extract working tree symbols and conflict state.
+/// Returns (symbols, is_dirty, has_conflicts).
+fn parse_status_for_symbols(status_output: &str) -> (String, bool, bool) {
     let mut has_untracked = false;
     let mut has_modified = false;
     let mut has_staged = false;
     let mut has_renamed = false;
     let mut has_deleted = false;
+    let mut has_conflicts = false;
 
     for line in status_output.lines() {
         if line.len() < 2 {
@@ -382,6 +391,15 @@ fn parse_status_for_symbols(status_output: &str) -> (String, bool) {
         if index_status == 'D' || worktree_status == 'D' {
             has_deleted = true;
         }
+
+        // Detect unmerged/conflicting paths (porcelain v1 two-letter codes)
+        let is_unmerged_pair = matches!(
+            (index_status, worktree_status),
+            ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D') | ('A', 'D') | ('D', 'A')
+        );
+        if is_unmerged_pair {
+            has_conflicts = true;
+        }
     }
 
     // Build working tree string
@@ -404,7 +422,7 @@ fn parse_status_for_symbols(status_output: &str) -> (String, bool) {
 
     let is_dirty = has_untracked || has_modified || has_staged || has_renamed || has_deleted;
 
-    (working_tree, is_dirty)
+    (working_tree, is_dirty, has_conflicts)
 }
 
 /// Collect branch data progressively, sending cell updates as each task completes.
@@ -438,7 +456,13 @@ pub fn collect_branch_progressive(
         spawn_ahead_behind(s, &ctx, tx.clone());
         spawn_branch_diff(s, &ctx, tx.clone());
         spawn_upstream(s, &ctx, false, tx.clone());
-        spawn_conflicts(s, &ctx, options.check_conflicts, false, tx.clone());
+        spawn_merge_tree_conflicts(
+            s,
+            &ctx,
+            options.check_merge_tree_conflicts,
+            false,
+            tx.clone(),
+        );
         spawn_ci_status(s, &ctx, options.fetch_ci, tx);
     });
 }
