@@ -10,11 +10,6 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use worktrunk::path::format_path_for_display;
 
-/// Format timestamp as verbose relative time (e.g., "2 hours ago")
-pub fn format_relative_time(timestamp: i64) -> String {
-    format_relative_time_impl(timestamp, get_now(), false)
-}
-
 /// Format timestamp as abbreviated relative time (e.g., "2h")
 pub fn format_relative_time_short(timestamp: i64) -> String {
     format_relative_time_impl(timestamp, get_now(), true)

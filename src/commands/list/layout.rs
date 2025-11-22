@@ -448,7 +448,7 @@ fn build_estimated_widths(max_branch: usize, show_full: bool, fetch_ci: bool) ->
     let ahead_behind_fixed = fit_header(HEADER_AHEAD_BEHIND, 7); // "↑99 ↓99"
     let branch_diff_fixed = fit_header(HEADER_BRANCH_DIFF, 9); // "+999 -999"
     let upstream_fixed = fit_header(HEADER_UPSTREAM, 7); // "↑99 ↓99"
-    let age_estimate = 15; // "3 months ago"
+    let age_estimate = 4; // "11mo" (short format)
     let ci_estimate = fit_header(HEADER_CI, 1); // Single indicator symbol
 
     // Assume columns will have data (better to show and hide than to not show)
@@ -675,7 +675,7 @@ fn allocate_columns_with_priority(
 /// - Ahead/behind: 7 chars ("↑99 ↓99")
 /// - Branch diff: 9 chars ("+999 -999")
 /// - Upstream: 7 chars ("↑99 ↓99")
-/// - Age: 15 chars ("3 months ago")
+/// - Age: 4 chars ("11mo" short format)
 /// - CI: 1 char (indicator symbol)
 /// - Message: flexible (20-100 chars)
 pub fn calculate_layout_from_basics(

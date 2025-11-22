@@ -1,4 +1,4 @@
-use crate::display::{format_relative_time, shorten_path, truncate_at_word_boundary};
+use crate::display::{format_relative_time_short, shorten_path, truncate_at_word_boundary};
 use anstyle::{AnsiColor, Color, Style};
 use std::path::Path;
 use unicode_width::UnicodeWidthStr;
@@ -630,7 +630,7 @@ impl ColumnLayout {
                 if ctx.worktree_data.is_some() && ctx.item.commit.is_none() {
                     cell.push_styled("⋯", Style::new().dimmed());
                 } else {
-                    let time_str = format_relative_time(ctx.commit.timestamp);
+                    let time_str = format_relative_time_short(ctx.commit.timestamp);
                     cell.push_styled(time_str, Style::new().dimmed());
                 }
 

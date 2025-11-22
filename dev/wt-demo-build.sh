@@ -27,6 +27,17 @@ require_bin() {
   fi
 }
 
+# Commit with a date offset (e.g., "7 days ago", "2 hours ago")
+commit_dated() {
+  local repo="$1"
+  local message="$2"
+  local date_offset="$3"
+  local date_str
+  date_str=$(date -v-"$date_offset" "+%Y-%m-%dT%H:%M:%S")
+  GIT_AUTHOR_DATE="$date_str" GIT_COMMITTER_DATE="$date_str" \
+    SKIP_DEMO_HOOK=1 git -C "$repo" commit -qm "$message"
+}
+
 write_starship_config() {
   mkdir -p "$(dirname "$STARSHIP_CONFIG_PATH")"
   cat >"$STARSHIP_CONFIG_PATH" <<'CFG'
@@ -102,7 +113,7 @@ prepare_repo() {
   git -C "$DEMO_REPO" config user.email "demo@example.com"
   printf "# Worktrunk demo\n\nThis repo is generated automatically.\n" >"$DEMO_REPO/README.md"
   git -C "$DEMO_REPO" add README.md
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "Initial demo commit"
+  commit_dated "$DEMO_REPO" "Initial demo commit" "7d"
   git -C "$DEMO_REPO" branch -m main
   git -C "$DEMO_REPO" remote add origin "$BARE_REMOTE"
   git -C "$DEMO_REPO" push -u origin main -q
@@ -143,11 +154,11 @@ mod tests {
 RUST
   echo "/target" >"$DEMO_REPO/.gitignore"
   git -C "$DEMO_REPO" add .gitignore Cargo.toml rust-toolchain.toml src/
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "Add Rust project with tests"
+  commit_dated "$DEMO_REPO" "Add Rust project with tests" "6d"
   # Pre-build to create Cargo.lock and cache dependencies
   (cd "$DEMO_REPO" && cargo build --release -q 2>/dev/null)
   git -C "$DEMO_REPO" add Cargo.lock
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "Add Cargo.lock"
+  commit_dated "$DEMO_REPO" "Add Cargo.lock" "6d"
   git -C "$DEMO_REPO" push -q
 
   # Add worktrunk project hooks
@@ -157,7 +168,7 @@ RUST
 test = "cargo nextest run --no-fail-fast"
 TOML
   git -C "$DEMO_REPO" add .config/wt.toml
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "Add project hooks"
+  commit_dated "$DEMO_REPO" "Add project hooks" "5d"
   git -C "$DEMO_REPO" push -q
 
   # Create mock gh CLI for CI status
@@ -180,13 +191,13 @@ if [[ "$1" == "pr" && "$2" == "list" ]]; then
   done
 
   case "$branch" in
-    feature/alpha)
+    alpha)
       echo '[{"state":"OPEN","headRefOid":"abc123","mergeStateStatus":"CLEAN","statusCheckRollup":[{"status":"COMPLETED","conclusion":"SUCCESS"}],"url":"https://github.com/acme/demo/pull/1"}]'
       ;;
-    feature/beta)
+    beta)
       echo '[{"state":"OPEN","headRefOid":"def456","mergeStateStatus":"CLEAN","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}],"url":"https://github.com/acme/demo/pull/2"}]'
       ;;
-    feature/hooks)
+    hooks)
       echo '[{"state":"OPEN","headRefOid":"ghi789","mergeStateStatus":"CLEAN","statusCheckRollup":[{"status":"COMPLETED","conclusion":"FAILURE"}],"url":"https://github.com/acme/demo/pull/3"}]'
       ;;
     *)
@@ -243,17 +254,17 @@ TOML
   echo "# Development" >>"$DEMO_REPO/README.md"
   echo "See CONTRIBUTING.md for guidelines." >>"$DEMO_REPO/README.md"
   git -C "$DEMO_REPO" add README.md
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "docs: add development section"
+  commit_dated "$DEMO_REPO" "docs: add development section" "1d"
   git -C "$DEMO_REPO" push -q
 
   create_branch_hooks
 }
 
 create_branch_alpha() {
-  local branch="feature/alpha"
-  local path="$DEMO_WORK_BASE/acme.${branch//\//-}"
+  local branch="alpha"
+  local path="$DEMO_WORK_BASE/acme.$branch"
   git -C "$DEMO_REPO" checkout -q -b "$branch" main
-  # Modify README: expand significantly (+12, -1)
+  # Modify README: small expansion (+12, -1)
   cat >"$DEMO_REPO/README.md" <<'MD'
 # Worktrunk demo
 
@@ -271,26 +282,26 @@ A demo repository for showcasing worktrunk features.
 Run `wt list` to see all worktrees.
 MD
   git -C "$DEMO_REPO" add README.md
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "docs: expand README"
+  commit_dated "$DEMO_REPO" "docs: expand README" "3d"
   # Add more commits to vary main↕
   echo "# Contributing" >>"$DEMO_REPO/README.md"
   echo "PRs welcome!" >>"$DEMO_REPO/README.md"
   git -C "$DEMO_REPO" add README.md
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "docs: add contributing section"
+  commit_dated "$DEMO_REPO" "docs: add contributing section" "3d"
   echo "" >>"$DEMO_REPO/README.md"
   echo "# License" >>"$DEMO_REPO/README.md"
   echo "MIT" >>"$DEMO_REPO/README.md"
   git -C "$DEMO_REPO" add README.md
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "docs: add license"
+  commit_dated "$DEMO_REPO" "docs: add license" "3d"
   git -C "$DEMO_REPO" push -u origin "$branch" -q
   git -C "$DEMO_REPO" checkout -q main
   git -C "$DEMO_REPO" worktree add -q "$path" "$branch"
   # Add unpushed commit (shows ⇡ in Status)
   echo "# FAQ" >>"$path/README.md"
   git -C "$path" add README.md
-  git -C "$path" commit -qm "docs: add FAQ section"
+  commit_dated "$path" "docs: add FAQ section" "3d"
   # Significant working tree changes
-  # Modified file (!)
+  # Modified file (!) - add lots of content for +100 diff
   cat >"$path/README.md" <<'MD'
 # Worktrunk demo
 
@@ -307,14 +318,114 @@ A powerful demo for worktrunk.
 - `wt list` - Show worktrees
 - `wt switch` - Switch worktree
 - `wt merge` - Merge and cleanup
+
+## API Reference
+
+### Core Functions
+
+#### `list_worktrees()`
+
+Returns all worktrees in the repository.
+
+```rust
+pub fn list_worktrees(repo: &Repository) -> Result<Vec<Worktree>> {
+    let worktrees = repo.worktrees()?;
+    worktrees.iter().map(|name| {
+        let wt = repo.find_worktree(name)?;
+        Ok(Worktree::from_git(wt))
+    }).collect()
+}
+```
+
+#### `switch_worktree()`
+
+Switches to the specified worktree.
+
+```rust
+pub fn switch_worktree(name: &str) -> Result<()> {
+    let path = find_worktree_path(name)?;
+    std::env::set_current_dir(path)?;
+    Ok(())
+}
+```
+
+#### `create_worktree()`
+
+Creates a new worktree for the given branch.
+
+```rust
+pub fn create_worktree(branch: &str, base: &str) -> Result<PathBuf> {
+    let repo = Repository::open_from_env()?;
+    let path = generate_worktree_path(&repo, branch)?;
+    repo.worktree(branch, &path, Some(&base))?;
+    Ok(path)
+}
+```
+
+#### `merge_worktree()`
+
+Merges the current branch into main and cleans up.
+
+```rust
+pub fn merge_worktree(opts: MergeOptions) -> Result<()> {
+    let branch = current_branch()?;
+    rebase_onto_main(&branch)?;
+    fast_forward_main(&branch)?;
+    if !opts.keep_worktree {
+        remove_worktree(&branch)?;
+    }
+    Ok(())
+}
+```
+
+### Helper Functions
+
+#### `find_worktree_path()`
+
+Resolves a worktree name to its filesystem path.
+
+#### `generate_worktree_path()`
+
+Generates a path for a new worktree based on naming conventions.
+
+#### `current_branch()`
+
+Returns the name of the currently checked out branch.
+
+#### `rebase_onto_main()`
+
+Rebases the given branch onto the main branch.
+
+#### `fast_forward_main()`
+
+Fast-forwards main to include the rebased commits.
+
+#### `remove_worktree()`
+
+Removes a worktree and optionally deletes its branch.
+
+## Error Handling
+
+All functions return `Result<T>` with detailed error types:
+
+- `WorktreeNotFound` - The specified worktree doesn't exist
+- `BranchInUse` - The branch is checked out in another worktree
+- `MergeConflict` - Conflicts detected during rebase
+- `DirtyWorkingTree` - Uncommitted changes present
+
+## Performance Notes
+
+- Listing uses parallel git operations for speed
+- Diff calculations are cached per-session
+- Remote fetches happen in background threads
 MD
   # Untracked file (?)
   echo "// scratch" >"$path/scratch.rs"
 }
 
 create_branch_beta() {
-  local branch="feature/beta"
-  local path="$DEMO_WORK_BASE/acme.${branch//\//-}"
+  local branch="beta"
+  local path="$DEMO_WORK_BASE/acme.$branch"
   git -C "$DEMO_REPO" checkout -q -b "$branch" main
   # No commits - same as main (↑0)
   git -C "$DEMO_REPO" push -u origin "$branch" -q
@@ -327,8 +438,8 @@ create_branch_beta() {
 }
 
 create_branch_hooks() {
-  local branch="feature/hooks"
-  local path="$DEMO_WORK_BASE/acme.${branch//\//-}"
+  local branch="hooks"
+  local path="$DEMO_WORK_BASE/acme.$branch"
   git -C "$DEMO_REPO" checkout -q -b "$branch" main
   # Refactor lib.rs: add multiply/subtract, remove both old tests (+12, -8)
   cat >"$DEMO_REPO/src/lib.rs" <<'RUST'
@@ -357,7 +468,7 @@ mod tests {
 }
 RUST
   git -C "$DEMO_REPO" add src/lib.rs
-  SKIP_DEMO_HOOK=1 git -C "$DEMO_REPO" commit -qm "feat: add math operations, consolidate tests"
+  commit_dated "$DEMO_REPO" "feat: add math operations, consolidate tests" "2H"
   # No push - this branch has no upstream
   git -C "$DEMO_REPO" checkout -q main
   git -C "$DEMO_REPO" worktree add -q "$path" "$branch"
@@ -390,6 +501,7 @@ record_text() {
   env DEMO_REPO="$DEMO_REPO" RAW_PATH="$DEMO_RAW" COMMANDS="$commands" bash -lc '
     set -o pipefail
     export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+    export COLUMNS=160
     export RUSTUP_HOME="'"$real_home"'/.rustup"
     export CARGO_HOME="'"$real_home"'/.cargo"
     export HOME="'"$DEMO_HOME"'"

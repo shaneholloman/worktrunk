@@ -6,9 +6,9 @@ Require git
 Set Shell "zsh"
 Set FontSize 19
 Set FontFamily "Geist Mono, Berkeley Mono, Fira Code, JetBrains Mono, Menlo, Apple Color Emoji"
-Set Width 1280
+Set Width 1600
 Set Height 720
-Set Theme { "name": "GitHub Light Custom", "black": "#8c959f", "red": "#d73a49", "green": "#22863a", "yellow": "#d29922", "blue": "#0969da", "magenta": "#8250df", "cyan": "#1b7c83", "white": "#8c959f", "brightBlack": "#8c959f", "brightRed": "#cb2431", "brightGreen": "#2ea043", "brightYellow": "#f2cc60", "brightBlue": "#218bff", "brightMagenta": "#a475f9", "brightCyan": "#39c5cf", "brightWhite": "#8c959f", "background": "#ffffff", "foreground": "#1f2328", "cursor": "#0969da", "selection": "#ddf4ff" }
+Set Theme { "name": "GitHub Light Custom", "black": "#8c959f", "red": "#d73a49", "green": "#22863a", "yellow": "#d29922", "blue": "#0969da", "magenta": "#8250df", "cyan": "#1b7c83", "white": "#8c959f", "brightBlack": "#8c959f", "brightRed": "#cb2431", "brightGreen": "#2ea043", "brightYellow": "#f2cc60", "brightBlue": "#218bff", "brightMagenta": "#a475f9", "brightCyan": "#39c5cf", "brightWhite": "#8c959f", "background": "#f6f8fa", "foreground": "#1f2328", "cursor": "#0969da", "selection": "#ddf4ff" }
 Set Padding 18
 Set LineHeight 1.12
 Set TypingSpeed 28ms
@@ -40,7 +40,7 @@ Type "wt list"
 Enter
 Sleep 1.6s
 
-Type "wt switch --create feature/reports"
+Type "wt switch --create notes"
 Enter
 Sleep 1.6s
 
