@@ -505,23 +505,17 @@ fn test_merge_squash_with_llm() {
         .output()
         .expect("Failed to commit");
 
-    // Configure mock LLM command via environment variable
+    // Configure mock LLM command via config file
     // Use sh to consume stdin and return a fixed message
+    let worktrunk_config = r#"
+[commit-generation]
+command = "sh"
+args = ["-c", "cat >/dev/null && echo 'feat: implement user authentication system'"]
+"#;
+    fs::write(repo.test_config_path(), worktrunk_config).expect("Failed to write worktrunk config");
+
     // (squashing is now the default, no need for --squash flag)
-    snapshot_merge_with_env(
-        "merge_squash_with_llm",
-        &repo,
-        &["main"],
-        Some(&feature_wt),
-        &[
-            ("WORKTRUNK_COMMIT_GENERATION__COMMAND", "sh"),
-            ("WORKTRUNK_COMMIT_GENERATION__ARGS__0", "-c"),
-            (
-                "WORKTRUNK_COMMIT_GENERATION__ARGS__1",
-                "cat >/dev/null && echo 'feat: implement user authentication system'",
-            ),
-        ],
-    );
+    snapshot_merge("merge_squash_with_llm", &repo, &["main"], Some(&feature_wt));
 }
 
 #[test]
@@ -799,19 +793,20 @@ fn test_merge_auto_commit_with_llm() {
     std::fs::write(feature_wt.join("auth.txt"), "improved auth with validation")
         .expect("Failed to write file");
 
+    // Configure mock LLM command via config file
+    let worktrunk_config = r#"
+[commit-generation]
+command = "echo"
+args = ["fix: improve auth validation logic"]
+"#;
+    fs::write(repo.test_config_path(), worktrunk_config).expect("Failed to write worktrunk config");
+
     // Merge with LLM configured - should auto-commit with LLM message
-    snapshot_merge_with_env(
+    snapshot_merge(
         "merge_auto_commit_with_llm",
         &repo,
         &["main"],
         Some(&feature_wt),
-        &[
-            ("WORKTRUNK_COMMIT_GENERATION__COMMAND", "echo"),
-            (
-                "WORKTRUNK_COMMIT_GENERATION__ARGS",
-                "fix: improve auth validation logic",
-            ),
-        ],
     );
 }
 
@@ -823,20 +818,20 @@ fn test_merge_auto_commit_and_squash() {
     std::fs::write(feature_wt.join("file1.txt"), "updated content 1")
         .expect("Failed to write file");
 
+    // Configure mock LLM command via config file
+    let worktrunk_config = r#"
+[commit-generation]
+command = "echo"
+args = ["fix: update file 1 content"]
+"#;
+    fs::write(repo.test_config_path(), worktrunk_config).expect("Failed to write worktrunk config");
+
     // Merge (squashing is default) - should stage uncommitted changes, then squash all commits including the staged changes
-    snapshot_merge_with_env(
+    snapshot_merge(
         "merge_auto_commit_and_squash",
         &repo,
         &["main"],
         Some(&feature_wt),
-        &[
-            ("WORKTRUNK_COMMIT_GENERATION__COMMAND", "echo"),
-            // Message is for the final squash commit
-            (
-                "WORKTRUNK_COMMIT_GENERATION__ARGS",
-                "fix: update file 1 content",
-            ),
-        ],
     );
 }
 

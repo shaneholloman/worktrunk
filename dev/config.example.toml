@@ -108,9 +108,15 @@ worktree-path = "../{{ main_worktree }}.{{ branch }}"
 # Available variables: {{ commits }}, {{ target_branch }}, {{ branch }}, {{ repo }}
 # If not specified, uses the default template:
 # squash-template = """
-# Generate a conventional commit message (feat/fix/docs/style/refactor) that combines these changes into one cohesive message. Output only the commit message without any explanation.
+# Generate a commit message that combines these changes into one cohesive message. Output only the commit message without any explanation.
 #
-# Squashing commits on current branch since branching from {{ target_branch }}
+# Format
+# - First line: <50 chars, present tense, describes WHAT and WHY (not HOW).
+# - Blank line after first line.
+# - Optional details with proper line breaks explaining context.
+# - Match the style of the existing commits being squashed (e.g., if they use conventional commits, use conventional commits).
+#
+# Squashing commits from {{ branch }} to merge into {{ target_branch }}
 #
 # Commits being combined:
 # {% for commit in commits %}
