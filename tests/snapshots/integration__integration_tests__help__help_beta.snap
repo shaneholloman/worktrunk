@@ -18,8 +18,8 @@ Usage: wt beta [OPTIONS] <COMMAND>
 
 Commands:
   run-hook  Run project hook
-  commit    Commit changes with LLM-generated message
-  squash    Squash commits with LLM-generated message
+  commit    Commit changes with LLM message
+  squash    Squash commits with LLM message
   push      Push changes to local target branch
   rebase    Rebase onto target
   select    Interactive worktree selector

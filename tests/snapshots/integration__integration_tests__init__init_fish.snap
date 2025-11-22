@@ -12,13 +12,13 @@ info:
     COLUMNS: "150"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
-    GIT_CONFIG_GLOBAL: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp1suEFj/test-gitconfig
+    GIT_CONFIG_GLOBAL: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpPPjZB2/test-gitconfig
     GIT_CONFIG_SYSTEM: /dev/null
     GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp1suEFj/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpPPjZB2/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -242,8 +242,8 @@ complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcomma
 complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -s v -l verbose -d 'Show commands and debug info'
 complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "run-hook" -d 'Run project hook'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "commit" -d 'Commit changes with LLM-generated message'
-complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "squash" -d 'Squash commits with LLM-generated message'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "commit" -d 'Commit changes with LLM message'
+complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "squash" -d 'Squash commits with LLM message'
 complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "push" -d 'Push changes to local target branch'
 complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "rebase" -d 'Rebase onto target'
 complete -c wt -n "__fish_wt_using_subcommand beta; and not __fish_seen_subcommand_from run-hook commit squash push rebase select" -f -a "select" -d 'Interactive worktree selector'

@@ -93,7 +93,7 @@ everything — standard `git worktree` commands continue working fine.
 
 ## Automation Features
 
-### LLM-Authored Commit Messages
+### LLM Commit Messages
 
 Worktrunk can invoke external commands during merge operations to generate
 commit messages. Simon Willison's [llm](https://llm.datasette.io/) tool reads
@@ -269,8 +269,8 @@ instructions: [Custom Worktree Status](#custom-worktree-status).
 **Auto-generated commit messages** - Simon Willison's
 [llm](https://llm.datasette.io/) tool works with worktrunk's
 commit generation. Install it, configure the command, and `wt merge` will
-automatically generate contextual commit messages. Setup guide: [LLM-Authored
-Commit Messages](#llm-authored-commit-messages).
+automatically generate contextual commit messages. Setup guide: [LLM Commit
+Messages](#llm-commit-messages).
 
 **Environment setup with hooks** - Use `post-create-command` (or
 `post-start-command` for non-blocking) to run setup for that
@@ -422,11 +422,11 @@ The merge operation follows a strict order designed for fail-fast execution:
 
 2. **Auto-commit uncommitted changes**
    If working tree has uncommitted changes, stages all changes (git add -A) and commits
-   with LLM-generated message.
+   with LLM message.
 
 3. **Squash commits (default)**
    By default, counts commits since merge base with target branch. When multiple
-   commits exist, squashes them into one with LLM-generated message. Skip squashing
+   commits exist, squashes them into one with LLM message. Skip squashing
    with --no-squash.
 
    A safety backup is created before squashing if there are working tree changes.
@@ -704,7 +704,7 @@ Options:
 
 **LLM SETUP GUIDE:**
 
-Enable AI-generated commit messages
+Enable LLM commit messages
 
 1. Install an LLM tool (llm, aichat)
 
@@ -754,8 +754,8 @@ Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
 
 These commands are subject to change:
 
-- `wt beta commit` - Commit changes with LLM-generated message
-- `wt beta squash [target]` - Squash commits with LLM-generated message
+- `wt beta commit` - Commit changes with LLM message
+- `wt beta squash [target]` - Squash commits with LLM message
 - `wt beta push [target]` - Push changes to target branch (auto-stashes non-conflicting edits)
 - `wt beta rebase [target]` - Rebase current branch onto target
 - `wt beta ask-approvals` - Approve commands in project config

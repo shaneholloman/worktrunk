@@ -275,7 +275,7 @@ A demo repository for showcasing worktrunk features.
 - Fast worktree switching
 - Integrated merge workflow
 - Pre-merge test hooks
-- LLM-generated commit messages
+- LLM commit messages
 
 ## Getting Started
 

@@ -84,7 +84,7 @@ assert_snapshot!("readme_example_name", combined_output);
 
 **README examples using standard snapshots (working, but require manual editing):**
 - `test_readme_example_simple()` - Quick start merge example
-- `test_readme_example_complex()` - LLM-powered commit example
+- `test_readme_example_complex()` - LLM commit example
 - `test_readme_example_hooks_post_create()` - Post-create hooks
 - `test_readme_example_hooks_pre_merge()` - Pre-merge hooks
 

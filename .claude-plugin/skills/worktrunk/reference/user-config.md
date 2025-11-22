@@ -14,7 +14,7 @@ Never install tools (llm, aichat) automatically. Provide installation commands f
 
 ## LLM Setup
 
-Most users want this for LLM-powered commit messages. Follow this sequence:
+Most users want this for LLM commit messages. Follow this sequence:
 
 ### Step 1: Check if LLM Tool Exists
 

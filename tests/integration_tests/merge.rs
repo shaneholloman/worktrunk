@@ -799,7 +799,7 @@ fn test_merge_auto_commit_with_llm() {
     std::fs::write(feature_wt.join("auth.txt"), "improved auth with validation")
         .expect("Failed to write file");
 
-    // Merge with LLM configured - should auto-commit with LLM-generated message
+    // Merge with LLM configured - should auto-commit with LLM message
     snapshot_merge_with_env(
         "merge_auto_commit_with_llm",
         &repo,

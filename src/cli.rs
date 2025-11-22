@@ -294,7 +294,7 @@ pub enum StandaloneCommand {
         force: bool,
     },
 
-    /// Commit changes with LLM-generated message
+    /// Commit changes with LLM message
     Commit {
         /// Skip approval prompts
         #[arg(short, long)]
@@ -305,7 +305,7 @@ pub enum StandaloneCommand {
         verify: bool,
     },
 
-    /// Squash commits with LLM-generated message
+    /// Squash commits with LLM message
     Squash {
         /// Target branch
         ///
@@ -696,10 +696,10 @@ wt remove  # (when already in main worktree)
 
 Commit → Squash → Rebase → Pre-merge hooks → Push → Cleanup → Post-merge hooks
 
-**Commit**: Uncommitted changes are staged and committed with LLM-generated message.
+**Commit**: Uncommitted changes are staged and committed with LLM message.
 Use `--tracked-only` to stage only tracked files.
 
-**Squash**: Multiple commits are squashed into one with LLM-generated message.
+**Squash**: Multiple commits are squashed into one with LLM message.
 Skip with `--no-squash`. Safety backup: `git reflog show refs/wt-backup/<branch>`
 
 **Rebase**: Branch is rebased onto target. Conflicts abort the merge immediately.
