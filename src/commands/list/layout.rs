@@ -183,15 +183,9 @@ pub const HEADER_CI: &str = "CI";
 pub const HEADER_COMMIT: &str = "Commit";
 pub const HEADER_MESSAGE: &str = "Message";
 
-/// Get safe terminal width for list rendering.
-///
-/// Reserves 2 columns as a safety margin to prevent line wrapping:
-/// - Off-by-one terminal behavior
-/// - Emoji width safety margin
-///
-/// This matches the clamping logic in progressive mode (collect.rs).
+/// Get terminal width for list rendering.
 pub fn get_safe_list_width() -> usize {
-    get_terminal_width().saturating_sub(2)
+    get_terminal_width()
 }
 
 /// Ensures a column width is at least as wide as its header.
