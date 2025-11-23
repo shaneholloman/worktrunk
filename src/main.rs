@@ -84,7 +84,7 @@ fn maybe_handle_help_with_pager() -> bool {
 
 fn main() {
     // Tell crossterm to always emit ANSI sequences
-    termimad::crossterm::style::force_color_output(true);
+    crossterm::style::force_color_output(true);
 
     if completion::maybe_handle_env_completion() {
         return;
