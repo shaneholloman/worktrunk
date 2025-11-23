@@ -36,7 +36,7 @@ $ wt switch --create fix-auth
 ```
 <!-- README:end -->
 
-...then do work. Then, when ready...
+...then do work. When ready...
 
 **Merge it:**
 
@@ -234,15 +234,13 @@ All checks passed!
 
 </details>
 
-**Skipping hooks:** `wt switch --no-verify` or `wt merge --no-verify`
-
-See `wt switch --help` and `wt merge --help` for template variables and security details.
+See `wt switch --help` and `wt merge --help` for skipping hooks, template variables, security details.
 
 ### Shell Integration
 
 Worktrunk requires shell integration in order to switch directories, during `wt
 switch` & `wt merge`/`wt remove`. To add automatic setup to shell config files
-(supports Bash, Zsh, and Fish):
+(Bash, Zsh, and Fish):
 
 ```bash
 wt config shell
@@ -412,7 +410,6 @@ wt switch -                              # Switch to previous worktree
 wt switch --create new-feature --base=^  # Branch from main (default)
 wt switch --create bugfix --base=@       # Branch from current HEAD
 wt remove @                              # Remove current worktree
-```
 ```
 <!-- README:end -->
 
