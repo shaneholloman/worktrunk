@@ -76,7 +76,12 @@ struct BranchCompleter {
 }
 
 impl ValueCompleter for BranchCompleter {
-    fn complete(&self, _current: &OsStr) -> Vec<CompletionCandidate> {
+    fn complete(&self, current: &OsStr) -> Vec<CompletionCandidate> {
+        // If user is typing an option (starts with -), don't suggest branches
+        if current.to_str().is_some_and(|s| s.starts_with('-')) {
+            return Vec::new();
+        }
+
         complete_branches(self.suppress_with_create)
     }
 }

@@ -1107,3 +1107,81 @@ fn test_complete_subcommands_filter_options() {
         "Options should appear when explicitly completing with --, got:\n{stdout}"
     );
 }
+
+#[test]
+fn test_complete_switch_option_prefix_shows_options_not_branches() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches that happen to contain "-c" in the name
+    Command::new("git")
+        .args(["branch", "fish-switch-complete"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["branch", "zsh-bash-complete"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test: wt switch --c<cursor>
+    // Should show options starting with --c (like --create), NOT branches containing "-c"
+    let output = temp
+        .completion_cmd(&["wt", "switch", "--c"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should NOT show branches (user is typing an option)
+    assert!(
+        !stdout.contains("fish-switch-complete"),
+        "Should not show branches when completing options, got:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("zsh-bash-complete"),
+        "Should not show branches when completing options, got:\n{stdout}"
+    );
+
+    // Should show options (--create, --config, etc.)
+    assert!(
+        only_option_suggestions(&stdout),
+        "Should only show options when input starts with --, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_complete_switch_single_dash_shows_options_not_branches() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create a branch that contains "-" in the name
+    Command::new("git")
+        .args(["branch", "feature-branch"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test: wt switch -<cursor>
+    // Should show short options, NOT branches containing "-"
+    let output = temp
+        .completion_cmd(&["wt", "switch", "-"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should NOT show branches
+    assert!(
+        !stdout.contains("feature-branch"),
+        "Should not show branches when completing options, got:\n{stdout}"
+    );
+
+    // Should show options
+    assert!(
+        only_option_suggestions(&stdout),
+        "Should only show options when input starts with -, got:\n{stdout}"
+    );
+}
