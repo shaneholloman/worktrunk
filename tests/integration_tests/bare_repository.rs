@@ -1,8 +1,9 @@
-use crate::common::{TestRepo, setup_temp_snapshot_settings, wt_command};
+use crate::common::{TestRepo, setup_temp_snapshot_settings, wait_for_file, wt_command};
 use insta_cmd::assert_cmd_snapshot;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 
 /// Helper to create a bare repository test setup
 struct BareRepoTest {
@@ -584,18 +585,10 @@ fn test_bare_repo_background_logs_location() {
         );
     }
 
-    // Give background process time to create log file (file gets created immediately, content written later)
-    std::thread::sleep(std::time::Duration::from_millis(500));
-
-    // Verify log file was created in bare repo's wt-logs directory (not in worktree's .git/)
+    // Wait for background process to create log file (poll instead of fixed sleep)
     // The key test is that the path is correct, not that content was written (background processes are flaky in tests)
     let log_path = test.bare_repo_path().join("wt-logs/feature-remove.log");
-    assert!(
-        log_path.exists(),
-        "Background removal log should be created in bare repo's wt-logs/ directory at {:?}.\nBare repo path: {:?}",
-        log_path,
-        test.bare_repo_path()
-    );
+    wait_for_file(&log_path, Duration::from_secs(5));
 
     // Verify it's NOT in the worktree's .git directory (which doesn't exist for linked worktrees)
     let wrong_path = main_worktree.join(".git/wt-logs/feature-remove.log");

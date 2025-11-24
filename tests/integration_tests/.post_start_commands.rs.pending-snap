@@ -13,3 +13,17 @@
 {"run_id":"1764015452-863643000","line":625,"new":null,"old":null}
 {"run_id":"1764015452-863643000","line":431,"new":null,"old":null}
 {"run_id":"1764015452-863643000","line":672,"new":null,"old":null}
+{"run_id":"1764016037-744134000","line":677,"new":null,"old":null}
+{"run_id":"1764016053-461593000","line":735,"new":null,"old":null}
+{"run_id":"1764016053-461593000","line":630,"new":null,"old":null}
+{"run_id":"1764016053-461593000","line":431,"new":null,"old":null}
+{"run_id":"1764016053-461593000","line":677,"new":null,"old":null}
+{"run_id":"1764016195-594834000","line":735,"new":null,"old":null}
+{"run_id":"1764016195-594834000","line":630,"new":null,"old":null}
+{"run_id":"1764016195-594834000","line":431,"new":null,"old":null}
+{"run_id":"1764016195-594834000","line":677,"new":{"module_name":"integration__integration_tests__post_start_commands","snapshot_name":"post_start_multiline_commands_with_newlines","metadata":{"source":"tests/integration_tests/post_start_commands.rs","assertion_line":677,"expression":"contents"},"snapshot":"first line"},"old":{"module_name":"integration__integration_tests__post_start_commands","metadata":{},"snapshot":"first line\nsecond line\nthird line"}}
+{"run_id":"1764016208-474514000","line":677,"new":null,"old":null}
+{"run_id":"1764016239-571456000","line":735,"new":null,"old":null}
+{"run_id":"1764016239-571456000","line":630,"new":null,"old":null}
+{"run_id":"1764016239-571456000","line":431,"new":null,"old":null}
+{"run_id":"1764016239-571456000","line":677,"new":null,"old":null}

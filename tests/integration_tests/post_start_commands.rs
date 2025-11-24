@@ -668,10 +668,10 @@ approved-commands = ["""
         &["--create", "feature"],
     );
 
-    // Wait for background command to create the file
+    // Wait for background command to create the file AND flush content
     let worktree_path = repo.root_path().parent().unwrap().join("test-repo.feature");
     let output_file = worktree_path.join("multiline.txt");
-    wait_for_file(output_file.as_path(), Duration::from_secs(5));
+    wait_for_file_content(output_file.as_path(), Duration::from_secs(5));
 
     let contents = fs::read_to_string(&output_file).unwrap();
     assert_snapshot!(contents, @r"

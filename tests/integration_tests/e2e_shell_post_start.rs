@@ -1,26 +1,11 @@
 use crate::common::{
     TestRepo, resolve_git_common_dir,
     shell::{execute_shell_script, generate_init_code, path_export_syntax, wt_bin_dir},
+    wait_for_file, wait_for_file_content,
 };
 use rstest::rstest;
 use std::fs;
-use std::thread;
-use std::time::{Duration, Instant};
-
-fn wait_for_file(path: &std::path::Path, timeout: Duration) {
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if path.exists() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-    panic!(
-        "File was not created within {:?}: {}",
-        timeout,
-        path.display()
-    );
-}
+use std::time::Duration;
 
 /// Test that post-start background commands work with shell integration
 #[rstest]
@@ -110,13 +95,10 @@ approved-commands = ["sleep 0.05 && echo 'Background task done' > bg_marker.txt"
         log_files
     );
 
-    // Wait for background command to complete (allow plenty of margin on CI)
-    wait_for_file(
-        worktree_path.join("bg_marker.txt").as_path(),
-        Duration::from_secs(1),
-    );
-
+    // Wait for background command to complete AND flush content (allow plenty of margin on CI)
     let marker_file = worktree_path.join("bg_marker.txt");
+    wait_for_file_content(marker_file.as_path(), Duration::from_secs(2));
+
     let content = fs::read_to_string(&marker_file).unwrap();
     assert!(
         content.contains("Background task done"),
@@ -323,28 +305,14 @@ approved-commands = ["sleep 0.05 && echo 'Fish background done' > fish_bg.txt"]
         output
     );
 
-    // Wait for background command (allow plenty of margin on CI)
-    wait_for_file(
-        repo.root_path()
-            .parent()
-            .unwrap()
-            .join("test-repo.fish-bg-test")
-            .join("fish_bg.txt")
-            .as_path(),
-        Duration::from_secs(1),
-    );
-
-    // Verify background command ran
+    // Wait for background command AND flush content (allow plenty of margin on CI)
     let worktree_path = repo
         .root_path()
         .parent()
         .unwrap()
         .join("test-repo.fish-bg-test");
     let marker_file = worktree_path.join("fish_bg.txt");
-    assert!(
-        marker_file.exists(),
-        "Fish background command should have created fish_bg.txt"
-    );
+    wait_for_file_content(marker_file.as_path(), Duration::from_secs(2));
 
     let content = fs::read_to_string(&marker_file).unwrap();
     assert!(
