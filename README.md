@@ -878,7 +878,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 <!-- README:help:wt step --help-md -->
 
 ```text
-wt step — Primitive operations (building blocks for workflows)
+wt step — Workflow building blocks
 Usage: step <COMMAND>
 
 Commands:

@@ -394,7 +394,7 @@ Stored in git config under `worktrunk.status.<branch>`."#
     },
 }
 
-/// Primitive operations (building blocks for workflows)
+/// Workflow building blocks
 #[derive(Subcommand)]
 pub enum StepCommand {
     /// Commit changes with LLM commit message
@@ -584,7 +584,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
         action: ConfigCommand,
     },
 
-    /// Primitive operations (building blocks for workflows)
+    /// Workflow building blocks
     #[command(name = "step")]
     Step {
         #[command(subcommand)]

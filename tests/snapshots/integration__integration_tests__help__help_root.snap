@@ -18,7 +18,7 @@ Usage: wt [OPTIONS] <COMMAND>
 
 Commands:
   config  Manage configuration and shell integration
-  step    Primitive operations (building blocks for workflows)
+  step    Workflow building blocks
   list    List worktrees and optionally branches
   switch  Switch to a worktree
   remove  Remove worktree and branch
