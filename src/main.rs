@@ -215,10 +215,23 @@ fn main() {
                         .and_then(|scan_result| {
                             use worktrunk::styling::format_bash_with_gutter;
 
-                            let changes_count = scan_result
+                            // Count shells that became (more) configured
+                            // A shell counts if any of its components changed (extension or completions)
+                            let shells_configured_count = scan_result
                                 .configured
                                 .iter()
-                                .filter(|r| !matches!(r.action, ConfigAction::AlreadyExists))
+                                .filter(|ext_result| {
+                                    let ext_changed =
+                                        !matches!(ext_result.action, ConfigAction::AlreadyExists);
+                                    let comp_changed = scan_result
+                                        .completion_results
+                                        .iter()
+                                        .find(|c| c.shell == ext_result.shell)
+                                        .is_some_and(|c| {
+                                            !matches!(c.action, ConfigAction::AlreadyExists)
+                                        });
+                                    ext_changed || comp_changed
+                                })
                                 .count();
 
                             // Show configured shells grouped with their completions
@@ -298,24 +311,26 @@ fn main() {
                                 return Err(anyhow::anyhow!("No shell config files found"));
                             }
 
-                            // Summary (count shells, not files - fish has both conf.d and completions)
-                            if changes_count > 0 {
+                            // Summary
+                            if shells_configured_count > 0 {
                                 crate::output::blank()?;
-                                let plural = if changes_count == 1 { "" } else { "s" };
+                                let plural = if shells_configured_count == 1 { "" } else { "s" };
                                 crate::output::success(format!(
-                                    "Configured {changes_count} shell{plural}"
+                                    "Configured {shells_configured_count} shell{plural}"
                                 ))?;
                             } else {
                                 // No action: all shells were already configured
                                 crate::output::info("All shells already configured")?;
                             }
 
-                            // Restart hint for current shell (only if config files changed, not just completions)
-                            if changes_count > 0 {
+                            // Restart hint: only shown if the current shell's extension changed
+                            // (completions are auto-sourced or sourced separately, no restart needed)
+                            if shells_configured_count > 0 {
                                 let current_shell = std::env::var("SHELL")
                                     .ok()
                                     .and_then(|s| s.rsplit('/').next().map(String::from));
 
+                                // Find if current shell had its extension changed (not just completions)
                                 let current_shell_result =
                                     current_shell.as_ref().and_then(|shell_name| {
                                         scan_result

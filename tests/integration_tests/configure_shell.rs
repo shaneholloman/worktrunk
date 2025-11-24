@@ -175,6 +175,61 @@ fn test_configure_shell_fish() {
     );
 }
 
+/// Test `wt config shell install` when extension exists but completions don't (Fish-specific)
+/// Regression test: previously showed "All shells already configured" even when completions were added
+#[test]
+fn test_configure_shell_fish_completions_only() {
+    let repo = TestRepo::new();
+    let temp_home = TempDir::new().unwrap();
+
+    // Create fish conf.d directory with wt.fish (extension exists)
+    let conf_d = temp_home.path().join(".config/fish/conf.d");
+    fs::create_dir_all(&conf_d).unwrap();
+    let fish_config = conf_d.join("wt.fish");
+    fs::write(
+        &fish_config,
+        "if type -q wt; command wt config shell init fish | source; end",
+    )
+    .unwrap();
+
+    // But NO completions file exists
+
+    let settings = setup_home_snapshot_settings(&temp_home);
+    settings.bind(|| {
+        let mut cmd = wt_command();
+        repo.clean_cli_env(&mut cmd);
+        set_temp_home_env(&mut cmd, temp_home.path());
+        cmd.env("SHELL", "/bin/fish");
+        cmd.arg("config")
+            .arg("shell")
+            .arg("install")
+            .arg("fish")
+            .arg("--force")
+            .current_dir(repo.root_path());
+
+        // Should say "Configured 1 shell" because completions were added,
+        // NOT "All shells already configured"
+        assert_cmd_snapshot!(cmd, @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        ⚪ Already configured shell extension for [1mfish[0m @ [1m~/.config/fish/conf.d/wt.fish[0m
+        ✅ Created completions for [1mfish[0m @ [1m~/.config/fish/completions/wt.fish[0m
+
+        ✅ Configured 1 shell
+
+        ----- stderr -----
+        ");
+    });
+
+    // Verify the completions file was created
+    let completions_file = temp_home.path().join(".config/fish/completions/wt.fish");
+    assert!(
+        completions_file.exists(),
+        "Fish completions file should be created"
+    );
+}
+
 /// Test `wt config shell install` when no config files exist
 #[test]
 fn test_configure_shell_no_files() {
