@@ -258,7 +258,7 @@ switch` & `wt merge`/`wt remove`. To add automatic setup to shell config files
 (Bash, Zsh, and Fish):
 
 ```bash
-wt config shell
+wt config shell install
 ```
 
 For manual setup instructions, see `wt config shell --help`.
@@ -839,7 +839,7 @@ For Claude:
 ```bash
 llm install llm-anthropic
 llm keys set anthropic
-llm models default claude-3.5-sonnet
+llm models default claude-haiku-4-5
 ```
 
 For OpenAI:
