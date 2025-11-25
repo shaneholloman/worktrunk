@@ -20,6 +20,10 @@ worktrees, tracking paths & statuses, cleaning up, etc, is manual. Worktrunk
 offers control, transparency & automation for this workflow, letting us scale
 the parallelism of agents.
 
+Built for developers running terminal-based AI coding agents — Claude Code,
+Codex CLI, Gemini CLI, Amp, aider — who want each agent on its own branch,
+working in parallel.
+
 ## Demo
 
 List worktrees, create a worktree, make a trivial change, merge the change:
@@ -96,7 +100,7 @@ Worktrunk is opinionated! It's designed for workflows which are:
 ...and that means...
 
 - Maximum automation: LLM commit messages, lifecycle hooks, Claude Code hooks
-  - A robust "auto-merge when *local-CI* passes" approach
+  - Auto-merge when local CI passes
 - A small surface area: three core commands
 - 1:1 mapping between worktree and branch, worktrees are addressed by their branch
 - Sibling layout: worktrees live at `repo.feature-x/` (path template configurable)
@@ -106,7 +110,7 @@ Worktrunk is opinionated! It's designed for workflows which are:
   adopting it for everything. Standard `git worktree` commands continue working
   fine!
 
-## Automation Features
+## Automations
 
 ### LLM Commit Messages
 
@@ -167,13 +171,13 @@ For more details, including custom prompt templates: `wt config --help`
 
 Automate tasks at different points in the worktree lifecycle. Configure hooks in `.config/wt.toml`.
 
-| Hook             | When                               | On Failure     |
-| ---------------- | ---------------------------------- | -------------- |
-| **post-create**  | After worktree created             | Warn, continue |
-| **post-start**   | After worktree created (background) | Warn, continue |
-| **pre-commit**   | Before squash commit created       | Stop merge     |
-| **pre-merge**    | After squash, before push          | Stop merge     |
-| **post-merge**   | After successful merge             | Warn, continue |
+| Hook             | When                                | Example                        |
+| ---------------- | ----------------------------------- | ------------------------------ |
+| **post-create**  | After worktree created              | `cp -r .cache`, `ln -s`        |
+| **post-start**   | After worktree created (background) | `npm install`, `cargo build`   |
+| **pre-commit**   | Before squash commit created        | `pre-commit run`               |
+| **pre-merge**    | After squash, before push           | `cargo test`, `pytest`         |
+| **post-merge**   | After successful merge              | `cargo install --path .`       |
 
 ```toml
 # Install dependencies, build setup
