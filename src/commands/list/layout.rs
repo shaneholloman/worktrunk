@@ -683,8 +683,16 @@ pub fn calculate_layout_from_basics(
     show_full: bool,
     fetch_ci: bool,
 ) -> LayoutConfig {
-    let terminal_width = get_safe_list_width();
+    calculate_layout_with_width(items, show_full, fetch_ci, get_safe_list_width())
+}
 
+/// Calculate layout with explicit width (for contexts like skim where available width differs)
+pub fn calculate_layout_with_width(
+    items: &[super::model::ListItem],
+    show_full: bool,
+    fetch_ci: bool,
+    terminal_width: usize,
+) -> LayoutConfig {
     // Calculate common prefix from worktree paths
     let paths: Vec<&Path> = items
         .iter()

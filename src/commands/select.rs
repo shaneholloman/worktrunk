@@ -24,7 +24,8 @@ use crate::output::handle_switch_output;
 /// - Mode 2 shows commits (related to "main↕" counts)
 /// - Mode 3 corresponds to "main…± (--full)" column
 ///
-/// Note: Order of modes 2 & 3 could potentially be swapped
+/// TODO: Consider adding mode 4 "remote±" showing diff vs upstream tracking branch
+/// (unpushed commits). Would align with "Remote⇅" column in `wt list`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PreviewMode {
     WorkingTree = 1,
@@ -77,12 +78,17 @@ impl Drop for PreviewState {
 
 /// Header item for column names (non-selectable)
 struct HeaderSkimItem {
-    text: String,
+    display_text: String,
+    display_text_with_ansi: String,
 }
 
 impl SkimItem for HeaderSkimItem {
     fn text(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.text)
+        Cow::Borrowed(&self.display_text)
+    }
+
+    fn display<'a>(&'a self, _context: skim::DisplayContext<'a>) -> skim::AnsiString<'a> {
+        skim::AnsiString::parse(&self.display_text_with_ansi)
     }
 
     fn output(&self) -> Cow<'_, str> {
@@ -113,12 +119,40 @@ impl SkimItem for WorktreeSkimItem {
 
     fn preview(&self, context: PreviewContext<'_>) -> ItemPreview {
         let mode = PreviewMode::read_from_state();
-        let result = self.preview_for_mode(mode, context.width);
+
+        // Build preview: tabs header + content
+        let mut result = Self::render_preview_tabs(mode);
+        result.push_str(&self.preview_for_mode(mode, context.width));
+
         ItemPreview::AnsiText(result)
     }
 }
 
 impl WorktreeSkimItem {
+    /// Render the tab header for the preview window
+    ///
+    /// Shows all preview modes as tabs, with the current mode bolded
+    /// and unselected modes dimmed. Controls are shown below in dimmed text.
+    fn render_preview_tabs(mode: PreviewMode) -> String {
+        /// Format a tab label with bold (active) or dimmed (inactive) styling
+        fn format_tab(label: &str, is_active: bool) -> String {
+            use anstyle::Style;
+            let style = if is_active {
+                Style::new().bold()
+            } else {
+                Style::new().dimmed()
+            };
+            format!("{}{}{}", style.render(), label, style.render_reset())
+        }
+
+        let tab1 = format_tab("1: HEAD±", mode == PreviewMode::WorkingTree);
+        let tab2 = format_tab("2: history", mode == PreviewMode::History);
+        let tab3 = format_tab("3: main…±", mode == PreviewMode::BranchDiff);
+        let controls = format_tab("ctrl-u/d: scroll | ctrl-p: preview", false);
+
+        format!("{} | {} | {}\n{}\n\n", tab1, tab2, tab3, controls)
+    }
+
     /// Render preview for the given mode with specified width
     fn preview_for_mode(&self, mode: PreviewMode, width: usize) -> String {
         match mode {
@@ -136,6 +170,7 @@ impl WorktreeSkimItem {
         // Check stat output first
         let mut stat_args = args.to_vec();
         stat_args.push("--stat");
+        stat_args.push("--color=always");
         let stat_width_arg = format!("--stat-width={}", width);
         stat_args.push(&stat_width_arg);
 
@@ -166,7 +201,9 @@ impl WorktreeSkimItem {
     /// Matches `wt list` "HEAD±" column
     fn render_working_tree_preview(&self, width: usize) -> String {
         let Some(wt_info) = self.item.worktree_data() else {
-            return "No worktree (branch only)\n".to_string();
+            // Branch without worktree - selecting will create one
+            use worktrunk::styling::INFO_EMOJI;
+            return format!("{INFO_EMOJI} Branch only — press Enter to create worktree\n");
         };
 
         let path = wt_info.path.display().to_string();
@@ -273,8 +310,8 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
 
     // Gather list data using simplified collection (buffered mode)
     let Some(list_data) = collect::collect(
-        &repo, false, // show_branches (select only shows worktrees, not branches)
-        false, // show_remotes (select only shows worktrees, not remote branches)
+        &repo, true,  // show_branches (include branches without worktrees)
+        false, // show_remotes (local branches only, not remote branches)
         false, // show_full (no full layout needed)
         false, // fetch_ci (no CI with select command)
         false, // check_conflicts (no conflict checking with select command)
@@ -289,15 +326,21 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
     let _current_worktree_path = repo.worktree_root().ok();
 
     // Use the same layout system as `wt list` for proper column alignment
-    let layout = super::list::layout::calculate_layout_from_basics(
+    // Skim uses ~50% of terminal width for the list (rest is preview), so calculate
+    // layout based on available width to avoid truncation
+    let terminal_width = super::list::layout::get_safe_list_width();
+    let skim_list_width = terminal_width / 2;
+    let layout = super::list::layout::calculate_layout_with_width(
         &list_data.items,
         false, // show_full
         false, // fetch_ci
+        skim_list_width,
     );
 
-    // Render header using layout system
+    // Render header using layout system (need both plain and styled text for skim)
     let header_line = layout.render_header_line();
-    let header_text = header_line.render();
+    let header_display_text = header_line.render();
+    let header_plain_text = header_line.plain_text();
 
     // Convert to skim items using the layout system for rendering
     let mut items: Vec<Arc<dyn SkimItem>> = list_data
@@ -323,7 +366,10 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
     // Insert header row at the beginning (will be non-selectable via header_lines option)
     items.insert(
         0,
-        Arc::new(HeaderSkimItem { text: header_text }) as Arc<dyn SkimItem>,
+        Arc::new(HeaderSkimItem {
+            display_text: header_plain_text,
+            display_text_with_ansi: header_display_text,
+        }) as Arc<dyn SkimItem>,
     );
 
     // Get state path for key bindings
@@ -331,14 +377,16 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
 
     // Configure skim options with Rust-based preview and mode switching keybindings
     let options = SkimOptionsBuilder::default()
-        .height("50%".to_string())
+        .height("90%".to_string())
         .layout("reverse".to_string())
         .header_lines(1) // Make first line (header) non-selectable
         .multi(false)
+        .no_info(true) // Hide info line (matched/total counter)
         .preview(Some("".to_string())) // Enable preview (empty string means use SkimItem::preview())
         .preview_window("right:50%".to_string())
         .color(Some(
-            "fg:-1,bg:-1,matched:108,current:-1,current_bg:254,current_match:108".to_string(),
+            "fg:-1,bg:-1,header:-1,matched:108,current:-1,current_bg:254,current_match:108"
+                .to_string(),
         ))
         .bind(vec![
             // Mode switching
@@ -360,9 +408,7 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
             // Preview toggle (ctrl-p is universally supported, unlike ctrl-/)
             "ctrl-p:toggle-preview".to_string(),
         ])
-        .header(Some(
-            "1: working | 2: history | 3: diff | ctrl-u/d: scroll | ctrl-p: preview".to_string(),
-        ))
+        // Legend/controls moved to preview window tabs (render_preview_tabs)
         .no_clear(true) // Prevent skim from clearing screen, we'll do it manually
         .build()
         .map_err(|e| anyhow::anyhow!(format!("Failed to build skim options: {}", e)))?;
@@ -396,10 +442,12 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
             handle_switch(&identifier, false, None, false, false, &config)?;
 
         // Clear the terminal screen after skim exits to prevent artifacts
+        // Use stderr for terminal control sequences - in directive mode, stdout goes to a FIFO
+        // for directive parsing, so terminal control must go through stderr to reach the TTY
         use crossterm::{execute, terminal};
-        use std::io::stdout;
-        execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
-        execute!(stdout(), crossterm::cursor::MoveTo(0, 0))?;
+        use std::io::stderr;
+        execute!(stderr(), terminal::Clear(terminal::ClearType::All))?;
+        execute!(stderr(), crossterm::cursor::MoveTo(0, 0))?;
 
         // Show success message; emit cd directive if in directive mode
         handle_switch_output(&result, &resolved_branch, false, is_directive_mode)?;
