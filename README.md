@@ -980,6 +980,31 @@ $ wt list
 
 </details>
 
+## Beta Commands
+
+Experimental commands under `wt beta`. Interface may change.
+
+### `wt beta select`
+
+Interactive worktree selector with fuzzy search and diff preview. Unix only.
+
+Preview modes (toggle with `1`/`2`/`3`):
+- **Mode 1**: Working tree changes (uncommitted)
+- **Mode 2**: History (commits not on main highlighted)
+- **Mode 3**: Branch diff (changes ahead of main)
+
+### `wt beta statusline`
+
+Single-line status for shell prompts, starship, or editor integrations.
+
+```
+branch  status  ±working  commits  upstream  ci
+```
+
+**Claude Code integration** (`--claude-code`): Reads workspace context from
+stdin, outputs directory, branch status, and model name. Can be used by Claude
+Code hooks to show worktree state in the status line.
+
 ## Project Status
 
 Worktrunk is in active development. The core features are stable and ready for
