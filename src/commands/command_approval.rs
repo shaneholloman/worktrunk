@@ -7,8 +7,8 @@ use anyhow::Context;
 use worktrunk::config::{Command, WorktrunkConfig};
 use worktrunk::git::not_interactive;
 use worktrunk::styling::{
-    AnstyleStyle, HINT_EMOJI, PROGRESS_EMOJI, WARNING, WARNING_BOLD, WARNING_EMOJI, eprint,
-    eprintln, format_bash_with_gutter, stderr,
+    AnstyleStyle, HINT_EMOJI, INFO_EMOJI, WARNING, WARNING_BOLD, WARNING_EMOJI, eprint, eprintln,
+    format_bash_with_gutter, stderr,
 };
 
 /// Batch approval helper used when multiple commands are queued for execution.
@@ -94,10 +94,11 @@ fn prompt_for_batch_approval(commands: &[&Command], project_id: &str) -> anyhow:
     for cmd in commands {
         // Format as: {phase} {bold}{name}{bold:#}:
         // Phase comes from the command itself (e.g., "pre-commit", "pre-merge")
+        // Uses INFO_EMOJI (⚪) since this is a preview, not active execution
         let phase = cmd.phase.to_string();
         let label = match &cmd.name {
-            Some(name) => format!("{PROGRESS_EMOJI} {phase} {bold}{name}{bold:#}:"),
-            None => format!("{PROGRESS_EMOJI} {phase}:"),
+            Some(name) => format!("{INFO_EMOJI} {phase} {bold}{name}{bold:#}:"),
+            None => format!("{INFO_EMOJI} {phase}:"),
         };
         eprintln!("{label}");
         eprint!("{}", format_bash_with_gutter(&cmd.expanded, ""));
