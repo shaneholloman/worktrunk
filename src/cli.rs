@@ -181,10 +181,8 @@ Install for specific shell only:
 wt config shell install zsh
 ```
 
-Skip confirmation prompt:
-```console
-wt config shell install --force
-```"#)]
+Shows proposed changes and waits for confirmation before modifying any files.
+Use --force to skip confirmation."#)]
     Install {
         /// Shell to install (default: all)
         #[arg(value_enum)]

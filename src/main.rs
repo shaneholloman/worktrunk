@@ -213,7 +213,6 @@ fn main() {
                         handle_configure_shell(shell, force)
                         .map_err(|e| anyhow::anyhow!("{}", e))
                         .and_then(|scan_result| {
-                            use worktrunk::styling::format_bash_with_gutter;
 
                             // Count shells that became (more) configured
                             // A shell counts if any of its components changed (extension or completions)
@@ -251,6 +250,8 @@ fn main() {
                                 );
 
                                 // Use appropriate output function based on action
+                                // Note: WouldAdd/WouldCreate are only returned in preview mode,
+                                // which is handled internally by prompt_for_confirmation()
                                 match result.action {
                                     ConfigAction::Added | ConfigAction::Created => {
                                         crate::output::success(message)?;
@@ -259,19 +260,8 @@ fn main() {
                                         crate::output::info(message)?;
                                     }
                                     ConfigAction::WouldAdd | ConfigAction::WouldCreate => {
-                                        crate::output::progress(message)?;
+                                        unreachable!("Preview actions handled by confirmation prompt")
                                     }
-                                }
-
-                                // Show config line in preview (so user sees what will be added)
-                                if matches!(
-                                    result.action,
-                                    ConfigAction::WouldAdd | ConfigAction::WouldCreate
-                                ) {
-                                    crate::output::gutter(format_bash_with_gutter(
-                                        &result.config_line,
-                                        "",
-                                    ))?;
                                 }
 
                                 // Show completion result for this shell
@@ -292,7 +282,7 @@ fn main() {
                                             crate::output::info(comp_message)?;
                                         }
                                         ConfigAction::WouldAdd | ConfigAction::WouldCreate => {
-                                            crate::output::progress(comp_message)?;
+                                            unreachable!("Preview actions handled by confirmation prompt")
                                         }
                                     }
                                 }
