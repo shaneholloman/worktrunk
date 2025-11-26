@@ -38,29 +38,32 @@ Three commands:
 | `wt merge`  | Squash, rebase, run hooks, merge, clean up      |
 | `wt list`   | Show status across all worktrees and branches   |
 
+**Create worktree and start Claude**
+
 ```bash
-# Create worktree and start Claude
 wt:   wt switch --create feature -x claude
 git:  git worktree add -b feature ../repo.feature main && cd ../repo.feature && claude
 ```
 
+**Merge and clean up**
+
 ```bash
-# Merge and clean up
 wt:   wt merge
 git:  cd ../repo && git merge feature && git worktree remove ../repo.feature && git branch -d feature
 ```
 
+**Full merge workflow**
+
 ```bash
-# Full merge workflow
 wt:   wt merge  # with hooks configured
 git:  git add -A
       git reset --soft $(git merge-base HEAD main)                        # squash
-      git diff --staged | llm "write a commit message" | git commit -F -  # [commit-generation]
+      git diff --staged | llm "write a commit message" | git commit -F -  # commit-generation
       git rebase main
-      cargo test                                       # [pre-merge] hook
+      cargo test                                       # pre-merge hook
       cd ../repo && git merge --ff-only feature
       git worktree remove ../repo.feature && git branch -d feature
-      cargo install --path .                           # [post-merge] hook
+      cargo install --path .                           # post-merge hook
 ```
 
 ## Quick Start
