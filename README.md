@@ -976,8 +976,6 @@ $ wt list
 
 </details>
 
-## Beta Commands
-
 Experimental commands under `wt beta`. Interface may change.
 
 ### `wt beta select`
