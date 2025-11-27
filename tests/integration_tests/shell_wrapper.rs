@@ -65,8 +65,8 @@ static WORKSPACE_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
 });
 
 /// Regex for normalizing git commit hashes (7-character hex)
-/// Matches 7-character lowercase hex sequences (git short hashes)
 /// Note: No word boundaries because ANSI codes (ending with 'm') directly precede hashes
+/// Shell wrapper tests produce non-deterministic SHAs due to PTY timing/environment
 static COMMIT_HASH_REGEX: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"[0-9a-f]{7}").unwrap());
 
@@ -121,7 +121,7 @@ impl ShellOutput {
         let workspace_normalized =
             WORKSPACE_REGEX.replace_all(&tmpdir_normalized, "[WORKSPACE]/tests/fixtures/");
 
-        // Normalize commit hashes (7-character hex strings)
+        // Normalize commit hashes (shell wrapper tests produce non-deterministic SHAs)
         let hash_normalized = COMMIT_HASH_REGEX.replace_all(&workspace_normalized, "[HASH]");
 
         // Collapse duplicate TMPDIR placeholders that can appear with nested mktemp paths.
@@ -1100,7 +1100,7 @@ approved-commands = [
         // Copy the fixture script to the test repo to avoid path issues with special characters
         // (CARGO_MANIFEST_DIR may contain single quotes like worktrunk.'∅' which break shell parsing)
         let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-        let script_content = fs::read(&fixtures_dir.join("mixed-output.sh")).unwrap();
+        let script_content = fs::read(fixtures_dir.join("mixed-output.sh")).unwrap();
         let script_path = repo.root_path().join("mixed-output.sh");
         fs::write(&script_path, &script_content).unwrap();
         // Make the script executable

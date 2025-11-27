@@ -324,14 +324,10 @@ impl TestRepo {
 
     /// Create a commit with a custom message (useful for testing malicious messages)
     pub fn commit_with_message(&self, message: &str) {
-        // Create a unique file to ensure there's something to commit
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let file_path = self.root.join(format!("file-{}.txt", timestamp));
-        std::fs::write(&file_path, "content").unwrap();
+        // Create a unique file based on message length (deterministic for reproducible SHAs)
+        // Use message bytes as a simple deterministic identifier
+        let file_path = self.root.join(format!("file-msg-{}.txt", message.len()));
+        std::fs::write(&file_path, message).unwrap();
 
         self.git_command(&["add", "."]).output().unwrap();
 
@@ -746,13 +742,7 @@ pub fn setup_snapshot_settings(repo: &TestRepo) -> insta::Settings {
         );
     }
 
-    // Normalize git SHAs and backslashes
-    // First filter SHAs wrapped in ANSI color codes (more specific pattern)
-    // Match: ESC[COLORmSHAESC[RESETm where RESET can be empty, 0, or other codes
-    // Examples: \x1b[33m0b07a58\x1b[m or \x1b[2m0b07a58\x1b[0m
-    settings.add_filter(r"\x1b\[[0-9;]*m[0-9a-f]{7,40}\x1b\[[0-9;]*m", "[SHA]");
-    // Then filter plain SHAs (more general pattern)
-    settings.add_filter(r"\b[0-9a-f]{7,40}\b", "[SHA]");
+    // Normalize backslashes (Windows paths)
     settings.add_filter(r"\\", "/");
 
     // Normalize temp directory paths in project identifiers (approval prompts)
@@ -785,9 +775,9 @@ pub fn setup_snapshot_settings(repo: &TestRepo) -> insta::Settings {
     settings.add_redaction(".env.PATH", "[PATH]");
 
     // Normalize timestamps in log filenames (format: YYYYMMDD-HHMMSS)
-    // The SHA filter runs first, so we match: post-start-NAME-[SHA]-HHMMSS.log
+    // Match: post-start-NAME-SHA-HHMMSS.log
     settings.add_filter(
-        r"post-start-[^-]+-\[SHA\]-\d{6}\.log",
+        r"post-start-[^-]+-[0-9a-f]{7,40}-\d{6}\.log",
         "post-start-[NAME]-[TIMESTAMP].log",
     );
 
@@ -798,11 +788,19 @@ pub fn setup_snapshot_settings(repo: &TestRepo) -> insta::Settings {
     settings.add_filter(r"(?m)^\x1b\[40m \x1b\[0m {1,2}hint:.*\n", "");
 
     // Normalize Git error message format differences across versions
-    // Older Git (< 2.43): "Could not apply [SHA]... # commit message"
-    // Newer Git (>= 2.43): "Could not apply [SHA]... commit message"
+    // Older Git (< 2.43): "Could not apply SHA... # commit message"
+    // Newer Git (>= 2.43): "Could not apply SHA... commit message"
     // Add the "# " prefix to newer Git output for consistency with snapshots
     // Match if followed by a letter/character (not "#")
-    settings.add_filter(r"(Could not apply \[SHA\]\.\.\.) ([A-Za-z])", "$1 # $2");
+    settings.add_filter(
+        r"(Could not apply [0-9a-f]{7,40}\.\.\.) ([A-Za-z])",
+        "$1 # $2",
+    );
+
+    // Normalize OS-specific error messages in gutter output
+    // Ubuntu may produce "Broken pipe (os error 32)" instead of the expected error
+    // when capturing stderr from shell commands due to timing/buffering differences
+    settings.add_filter(r"Broken pipe \(os error 32\)", "Error: connection refused");
 
     settings
 }

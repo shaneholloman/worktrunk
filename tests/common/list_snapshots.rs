@@ -21,7 +21,6 @@ fn base_settings(repo: &TestRepo) -> Settings {
 
 pub fn standard_settings(repo: &TestRepo) -> Settings {
     let mut settings = base_settings(repo);
-    settings.add_filter(r"\b[0-9a-f]{7,40}\b", "[SHA]   ");
     // Normalize WORKTRUNK_CONFIG_PATH across platforms (macOS, Linux, Windows)
     // macOS: /var/folders/.../T/.tmpXXX/test-config.toml
     // Linux: /tmp/.tmpXXX/test-config.toml
@@ -34,7 +33,6 @@ pub fn standard_settings(repo: &TestRepo) -> Settings {
 
 pub fn json_settings(repo: &TestRepo) -> Settings {
     let mut settings = base_settings(repo);
-    settings.add_filter(r#""head": "[0-9a-f]{40}""#, r#""head": "[SHA]""#);
     settings.add_filter(r#""timestamp": \d+"#, r#""timestamp": 0"#);
     settings.add_filter(r"\\u001b\[32m", "[GREEN]");
     settings.add_filter(r"\\u001b\[31m", "[RED]");

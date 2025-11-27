@@ -44,8 +44,8 @@ This creates `../repo.fix-auth` on branch `fix-auth`.
 
 ```console
 $ wt merge
-🔄 Merging 1 commit to main @ a1b2c3d (no commit/squash/rebase needed)
-   * a1b2c3d Implement JWT validation
+🔄 Merging 1 commit to main @ d29e0fd (no commit/squash/rebase needed)
+   * d29e0fd Implement JWT validation
     auth.rs | 13 +++++++++++++
     1 file changed, 13 insertions(+)
 ✅ Merged to main (1 commit, 1 file, +13)
@@ -162,7 +162,7 @@ $ wt merge
    - Implement token refresh mechanism with expiry handling
    - Add JWT encoding/decoding with signature verification
    - Create test suite covering all authentication flows
-✅ Squashed @ a1b2c3d
+✅ Squashed @ 95c3316
 🔄 Running pre-merge test:
    cargo test
     Finished test [unoptimized + debuginfo] target(s) in 0.12s
@@ -179,8 +179,8 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
    cargo clippy
     Checking worktrunk v0.1.0
     Finished dev [unoptimized + debuginfo] target(s) in 1.23s
-🔄 Merging 1 commit to main @ a1b2c3d (no rebase needed)
-   * a1b2c3d feat(auth): Implement JWT authentication system
+🔄 Merging 1 commit to main @ 95c3316 (no rebase needed)
+   * 95c3316 feat(auth): Implement JWT authentication system
     auth.rs      |  8 ++++++++
     auth_test.rs | 17 +++++++++++++++++
     jwt.rs       |  8 ++++++++
@@ -256,7 +256,7 @@ $ wt merge
 
    Implement login and token refresh endpoints with JWT validation.
    Includes comprehensive test coverage and input validation.
-✅ Squashed @ a1b2c3d
+✅ Squashed @ [HASH]
 🔄 Running pre-merge test:
    uv run pytest
 
@@ -274,8 +274,8 @@ tests/test_auth.py::test_token_validation PASSED                         [100%]
 
 All checks passed!
 
-🔄 Merging 1 commit to main @ a1b2c3d (no rebase needed)
-   * a1b2c3d feat(api): Add user authentication endpoints
+🔄 Merging 1 commit to main @ [HASH] (no rebase needed)
+   * [HASH] feat(api): Add user authentication endpoints
     api/auth.py        | 31 +++++++++++++++++++++++++++++++
     tests/test_auth.py | 14 ++++++++++++++
     2 files changed, 45 insertions(+)
