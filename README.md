@@ -68,7 +68,7 @@ $ wt merge
     auth.rs | 13 +++++++++++++
     1 file changed, 13 insertions(+)
 ✅ Merged to main (1 commit, 1 file, +13)
-🔄 Removing fix-auth worktree & branch in background
+🔄 Removing fix-auth worktree & branch in background (ancestor of main)
 ```
 
 <!-- END AUTO-GENERATED -->
@@ -204,7 +204,7 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
     jwt.rs       |  8 ++++++++
     3 files changed, 33 insertions(+)
 ✅ Merged to main (1 commit, 3 files, +33)
-🔄 Removing feature-auth worktree & branch in background
+🔄 Removing feature-auth worktree & branch in background (ancestor of main)
 🔄 Running post-merge install:
    cargo install --path .
   Installing worktrunk v0.1.0
@@ -298,7 +298,7 @@ All checks passed!
     tests/test_auth.py | 14 ++++++++++++++
     2 files changed, 45 insertions(+)
 ✅ Merged to main (1 commit, 2 files, +45)
-🔄 Removing feature-auth worktree & branch in background
+🔄 Removing feature-auth worktree & branch in background (ancestor of main)
 ```
 
 <!-- END AUTO-GENERATED -->

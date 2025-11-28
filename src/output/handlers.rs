@@ -45,42 +45,67 @@ fn format_switch_success_message(
     }
 }
 
+/// Why a branch is considered integrated into the target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IntegrationReason {
+    /// Branch is an ancestor of target (traditional merge)
+    Merged,
+    /// Branch's tree SHA matches target's tree SHA (squash merge/rebase)
+    ContentsMatch,
+}
+
 /// Check if a branch's content has been integrated into the target.
 ///
-/// Returns true if the branch is safe to delete because either:
-/// - The branch is an ancestor of the target (traditional merge), OR
-/// - The branch's tree SHA matches the target's tree SHA (squash merge/rebase)
+/// Returns the reason if the branch is safe to delete:
+/// - `Merged`: The branch is an ancestor of the target (traditional merge)
+/// - `ContentsMatch`: The branch's tree SHA matches the target's tree SHA (squash merge/rebase)
 ///
-/// Returns false if neither condition is met, or if an error occurs (e.g., invalid refs).
+/// Returns None if neither condition is met, or if an error occurs (e.g., invalid refs).
 /// This fail-safe default prevents accidental branch deletion when integration cannot
 /// be determined.
-fn is_branch_integrated(repo: &Repository, branch_name: &str, target: &str) -> bool {
+fn get_integration_reason(
+    repo: &Repository,
+    branch_name: &str,
+    target: &str,
+) -> Option<IntegrationReason> {
     // Check traditional merge relationship
     if repo.is_ancestor(branch_name, target).unwrap_or(false) {
-        return true;
+        return Some(IntegrationReason::Merged);
     }
 
     // Check if tree content matches (handles squash merge/rebase)
-    repo.trees_match(branch_name, target).unwrap_or(false)
+    if repo.trees_match(branch_name, target).unwrap_or(false) {
+        return Some(IntegrationReason::ContentsMatch);
+    }
+
+    None
 }
 
 /// Attempt to delete a branch if it's integrated or force_delete is set.
 ///
 /// Returns:
-/// - `Ok(true)` if branch was deleted
-/// - `Ok(false)` if branch was not deleted (not integrated, and not force)
+/// - `Ok(Some(reason))` if branch was deleted due to integration
+/// - `Ok(Some(None))` if branch was force-deleted (no integration reason)
+/// - `Ok(None)` if branch was not deleted (not integrated and not forced)
 /// - `Err` if git command failed
+///
+/// The outer Option indicates whether deletion occurred; the inner Option
+/// indicates the integration reason (None when force-deleted).
 fn delete_branch_if_safe(
     repo: &Repository,
     branch_name: &str,
     target: &str,
     force_delete: bool,
-) -> anyhow::Result<bool> {
-    if !force_delete && !is_branch_integrated(repo, branch_name, target) {
-        return Ok(false);
+) -> anyhow::Result<Option<Option<IntegrationReason>>> {
+    let reason = get_integration_reason(repo, branch_name, target);
+
+    // Delete if integrated or force-delete requested
+    if reason.is_none() && !force_delete {
+        return Ok(None); // Not integrated and not forced - don't delete
     }
+
     repo.run_command(&["branch", "-D", branch_name])?;
-    Ok(true)
+    Ok(Some(reason)) // Deleted: Some(Some(reason)) if integrated, Some(None) if forced
 }
 
 /// Handle the result of a branch deletion attempt.
@@ -88,15 +113,15 @@ fn delete_branch_if_safe(
 /// Shows appropriate warnings for non-deleted branches.
 ///
 /// Returns:
-/// - `Ok(true)` if branch was deleted
-/// - `Ok(false)` if branch was not deleted (warning shown)
+/// - `Ok(Some(reason))` if branch was deleted (reason is None if force-deleted)
+/// - `Ok(None)` if branch was not deleted (warning shown)
 fn handle_branch_deletion_result(
-    result: anyhow::Result<bool>,
+    result: anyhow::Result<Option<Option<IntegrationReason>>>,
     branch_name: &str,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Option<IntegrationReason>>> {
     match result {
-        Ok(true) => Ok(true),
-        Ok(false) => {
+        Ok(Some(reason)) => Ok(Some(reason)), // Deleted (with or without integration reason)
+        Ok(None) => {
             // Branch not integrated - show warning
             super::warning(cformat!(
                 "<yellow>Could not delete branch <bold>{branch_name}</></>"
@@ -106,7 +131,7 @@ fn handle_branch_deletion_result(
                 "",
                 None,
             ))?;
-            Ok(false)
+            Ok(None)
         }
         Err(e) => {
             // Git command failed - show warning with error details
@@ -114,25 +139,43 @@ fn handle_branch_deletion_result(
                 "<yellow>Could not delete branch <bold>{branch_name}</></>"
             ))?;
             super::gutter(format_with_gutter(&e.to_string(), "", None))?;
-            Ok(false)
+            Ok(None)
         }
     }
 }
 
 /// Get flag acknowledgment note for remove messages
-fn get_flag_note(no_delete_branch: bool, force_delete: bool, branch_deleted: bool) -> &'static str {
+///
+/// `deletion_result`: None = not deleted, Some(None) = force-deleted, Some(Some(reason)) = integrated
+/// `target_branch`: The branch we checked integration against (shown in reason)
+fn get_flag_note(
+    no_delete_branch: bool,
+    force_delete: bool,
+    deletion_result: Option<Option<IntegrationReason>>,
+    target_branch: Option<&str>,
+) -> String {
     if no_delete_branch {
-        " (--no-delete-branch)"
-    } else if force_delete && branch_deleted {
-        " (--force-delete)"
+        " (--no-delete-branch)".to_string()
+    } else if force_delete && deletion_result.is_some() {
+        " (--force-delete)".to_string()
+    } else if let Some(target) = target_branch {
+        // After wt merge: show specific integration reason with target
+        match deletion_result {
+            Some(Some(IntegrationReason::Merged)) => format!(" (ancestor of {target})"),
+            Some(Some(IntegrationReason::ContentsMatch)) => format!(" (contents match {target})"),
+            Some(None) | None => String::new(),
+        }
     } else {
-        ""
+        // Explicit wt remove: no reason needed, user requested it
+        String::new()
     }
 }
 
 /// Format message for remove worktree operation (includes emoji and color for consistency)
 ///
-/// `branch_deleted` indicates whether branch deletion actually succeeded (not just attempted)
+/// `deletion_result`: None = not deleted, Some(None) = force-deleted, Some(Some(reason)) = integrated
+/// `target_branch`: The branch we checked integration against (Some = merge context, None = explicit remove)
+#[allow(clippy::too_many_arguments)]
 fn format_remove_worktree_message(
     main_path: &std::path::Path,
     changed_directory: bool,
@@ -140,17 +183,23 @@ fn format_remove_worktree_message(
     branch: Option<&str>,
     no_delete_branch: bool,
     force_delete: bool,
-    branch_deleted: bool,
+    deletion_result: Option<Option<IntegrationReason>>,
+    target_branch: Option<&str>,
 ) -> String {
     // Build the action description based on actual outcome
-    let action = if no_delete_branch || !branch_deleted {
+    let action = if no_delete_branch || deletion_result.is_none() {
         "Removed worktree"
     } else {
         "Removed worktree & branch"
     };
 
     // Show flag acknowledgment when applicable
-    let flag_note = get_flag_note(no_delete_branch, force_delete, branch_deleted);
+    let flag_note = get_flag_note(
+        no_delete_branch,
+        force_delete,
+        deletion_result,
+        target_branch,
+    );
 
     let branch_display = branch.or(Some(branch_name));
 
@@ -366,9 +415,9 @@ fn handle_branch_only_output(
 
     let repo = worktrunk::git::Repository::current();
     let result = delete_branch_if_safe(&repo, branch_name, "HEAD", force_delete);
-    let deleted = handle_branch_deletion_result(result, branch_name)?;
+    let integration_reason = handle_branch_deletion_result(result, branch_name)?;
 
-    if deleted {
+    if integration_reason.is_some() {
         let flag_note = if force_delete {
             " (--force-delete)"
         } else {
@@ -433,32 +482,47 @@ fn handle_removed_worktree_output(
     if background {
         // Background mode: spawn detached process
 
-        // Determine if we should delete the branch (check once upfront)
-        let should_delete_branch = if no_delete_branch {
-            false
+        // Determine if we should delete the branch and why (check once upfront)
+        let (should_delete_branch, integration_reason) = if no_delete_branch {
+            (false, None)
         } else if force_delete {
             // Force delete requested - always delete
-            true
+            (true, None)
         } else {
             // Check if branch is integrated (ancestor or matching tree content)
             let check_target = target_branch.unwrap_or("HEAD");
             let deletion_repo = worktrunk::git::Repository::at(main_path);
-            is_branch_integrated(&deletion_repo, branch_name, check_target)
+            let reason = get_integration_reason(&deletion_repo, branch_name, check_target);
+            (reason.is_some(), reason)
         };
 
-        // Show progress message based on what we'll do
+        // Build deletion_result in the format expected by get_flag_note
+        let deletion_result: Option<Option<IntegrationReason>> = if should_delete_branch {
+            if force_delete {
+                Some(None) // force-deleted
+            } else {
+                Some(integration_reason) // integrated
+            }
+        } else {
+            None // not deleted
+        };
+
+        let flag_note = get_flag_note(
+            no_delete_branch,
+            force_delete,
+            deletion_result,
+            target_branch,
+        );
+
+        // Reason in parentheses: user flags shown explicitly, integration reason for automatic cleanup
         let action = if no_delete_branch {
             cformat!(
-                "<cyan>Removing <bold>{branch_name}</> worktree in background; retaining branch (--no-delete-branch)</>"
+                "<cyan>Removing <bold>{branch_name}</> worktree in background; retaining branch{flag_note}</>"
             )
         } else if should_delete_branch {
-            if force_delete {
-                cformat!(
-                    "<cyan>Removing <bold>{branch_name}</> worktree & branch in background (--force-delete)</>"
-                )
-            } else {
-                cformat!("<cyan>Removing <bold>{branch_name}</> worktree & branch in background</>")
-            }
+            cformat!(
+                "<cyan>Removing <bold>{branch_name}</> worktree & branch in background{flag_note}</>"
+            )
         } else {
             cformat!(
                 "<cyan>Removing <bold>{branch_name}</> worktree in background; retaining unmerged branch</>"
@@ -493,14 +557,14 @@ fn handle_removed_worktree_output(
         }
 
         // Delete the branch (unless --no-delete-branch was specified)
-        let branch_deleted = if !no_delete_branch {
+        let integration_reason = if !no_delete_branch {
             let deletion_repo = worktrunk::git::Repository::at(main_path);
             let check_target = target_branch.unwrap_or("HEAD");
             let result =
                 delete_branch_if_safe(&deletion_repo, branch_name, check_target, force_delete);
             handle_branch_deletion_result(result, branch_name)?
         } else {
-            false
+            None
         };
 
         // Show success message (includes emoji and color)
@@ -511,7 +575,8 @@ fn handle_removed_worktree_output(
             branch,
             no_delete_branch,
             force_delete,
-            branch_deleted,
+            integration_reason,
+            target_branch,
         ))?;
         super::flush()?;
         Ok(())

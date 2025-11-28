@@ -147,9 +147,13 @@ Use consistent punctuation and structure for related messages:
 
 **Parallel structure:** Related messages should follow the same pattern:
 ```rust
-// ✅ GOOD - parallel structure distinguishes user choice from system decision
-"Removing feature worktree & branch in background"                                // Merged (will delete)
-"Removing feature worktree in background; retaining unmerged branch"              // Unmerged (system keeps)
+// ✅ GOOD - parallel structure distinguishes context and integration reason
+// After wt merge: show integration reason with target in parentheses
+"Removing feature worktree & branch in background (ancestor of main)"       // Traditional merge (ancestor)
+"Removing feature worktree & branch in background (contents match main)"    // Squash/rebase (tree SHA matches)
+// Explicit wt remove: no parenthetical needed, user requested it
+"Removing feature worktree & branch in background"                          // Explicit remove
+"Removing feature worktree in background; retaining unmerged branch"        // Unmerged (system keeps)
 "Removing feature worktree in background; retaining branch (--no-delete-branch)"  // User flag (user keeps)
 ```
 
