@@ -459,4 +459,4 @@ wt switch --create test-hooks     # Test hooks work
 
 ## Example Config
 
-See `.config/wt.example.toml` in the worktrunk repository for a complete annotated example.
+See `dev/wt.example.toml` in the worktrunk repository for a complete annotated example.

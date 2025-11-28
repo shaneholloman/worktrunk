@@ -117,12 +117,6 @@ worktree-path = ".worktrees/{{ branch }}"
 ```
 Result: `~/code/myproject/.worktrees/feature-auth`
 
-Shared directory:
-```toml
-worktree-path = "../worktrees/{{ main_worktree }}/{{ branch }}"
-```
-Result: `~/code/worktrees/myproject/feature-auth`
-
 </example>
 
 ### Workflow
@@ -226,9 +220,8 @@ squash-template = "..."
 squash-template-file = "~/.config/worktrunk/squash-template.txt"
 
 # Approved Commands (auto-populated by wt switch --execute --force)
-[[approved-commands]]
-project = "github.com/user/repo"
-command = "npm install"
+[projects."github.com/user/repo"]
+approved-commands = ["npm install"]
 ```
 
 ## Troubleshooting
@@ -270,4 +263,4 @@ wt config --help      # Show LLM setup guide
 
 ## Example Config
 
-See `config.example.toml` in the worktrunk repository for a complete annotated example.
+See `dev/config.example.toml` in the worktrunk repository for a complete annotated example.

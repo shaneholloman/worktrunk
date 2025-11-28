@@ -1,5 +1,5 @@
 # Worktrunk Project Configuration
-# Location: <repo>/.config/wt.toml
+# Copy to: <repo>/.config/wt.toml
 #
 # This file defines project-specific hooks that run automatically during
 # worktree operations. It should be checked into git and shared across all

@@ -225,7 +225,7 @@ pub struct MergeConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub squash: Option<bool>,
 
-    /// Create commit after merge (default: true)
+    /// Commit, squash, and rebase during merge (default: true)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit: Option<bool>,
 

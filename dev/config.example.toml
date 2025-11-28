@@ -1,9 +1,9 @@
 # Worktrunk Global Configuration
-# Location (XDG Base Directory spec):
-#   macOS/Linux:   ~/.config/worktrunk/config.toml (or $XDG_CONFIG_HOME/worktrunk/config.toml)
-#   Windows:       %APPDATA%\worktrunk\config.toml
+# Copy to: ~/.config/worktrunk/config.toml (or use `wt config create`)
 #
-# Generate with: wt config create
+# Alternative locations (XDG Base Directory spec):
+#   macOS/Linux:   $XDG_CONFIG_HOME/worktrunk/config.toml
+#   Windows:       %APPDATA%\worktrunk\config.toml
 
 # Commit Message Generation (Optional)
 # For generating commit messages during merge operations (wt merge)
@@ -18,17 +18,30 @@ args = ["-m", "claude-haiku-4.5"]
 # command = "aichat"
 # args = ["-m", "claude:claude-haiku-4.5"]
 
+# Optional: Load template from file (mutually exclusive with 'template')
+# Supports ~ expansion: ~/.config/worktrunk/commit-template.txt
+# template-file = "~/.config/worktrunk/commit-template.txt"
+
+# Optional: Load squash template from file (mutually exclusive with 'squash-template')
+# Supports ~ expansion: ~/.config/worktrunk/squash-template.txt
+# squash-template-file = "~/.config/worktrunk/squash-template.txt"
+
+# See "Custom Prompt Templates" section at end of file for inline template options.
+
 # Worktree Path Template
-# Variables: {{ main_worktree }} = main worktree directory name, {{ branch }} = branch name
-# Branch slashes are replaced with dashes (feature/auth → feature-auth)
-# Paths are relative to the main worktree root (original repository directory)
+# Variables:
+#   {{ main_worktree }} - Main worktree directory name (e.g., "myproject")
+#   {{ branch }}        - Branch name with slashes replaced by dashes (feature/auth → feature-auth)
+#
+# Paths are relative to the main worktree root (original repository directory).
+#
+# Example paths created (main worktree at /Users/dev/myproject, branch feature/auth):
+#   "../{{ main_worktree }}.{{ branch }}" → /Users/dev/myproject.feature-auth
+#   ".worktrees/{{ branch }}"             → /Users/dev/myproject/.worktrees/feature-auth
 worktree-path = "../{{ main_worktree }}.{{ branch }}"
 
 # Alternative: Inside repo (useful for bare repos)
 # worktree-path = ".worktrees/{{ branch }}"
-
-# Alternative: Shared directory for multiple repos
-# worktree-path = "../worktrees/{{ main_worktree }}/{{ branch }}"
 
 # List Command Defaults
 # Configure default behavior for `wt list`
@@ -45,30 +58,24 @@ stage = "all"          # What to stage: "all", "tracked", or "none"
 # Note: `stage` defaults from [commit] section above
 [merge]
 squash = true          # Squash commits when merging
-commit = true          # Create commit after merge
+commit = true          # Commit, squash, and rebase during merge
 remove = true          # Remove worktree after merge
 verify = true          # Run project hooks
 
 # Approved Commands
 # Commands approved for automatic execution after switching worktrees
 # Auto-populated when you use: wt switch --execute "command" --force
-[[approved-commands]]
-project = "github.com/user/repo"
-command = "npm install"
+[projects."github.com/user/repo"]
+approved-commands = ["npm install"]
 
 # NOTE: For project-specific hooks (post-create, post-start, pre-merge, etc.),
 # use a separate PROJECT config file at <repo>/.config/wt.toml
-# See: .config/wt.example.toml for project configuration examples
+# See: dev/wt.example.toml for project configuration examples
 
-# Optional: Load template from file (mutually exclusive with 'template')
-# Supports ~ expansion: ~/.config/worktrunk/commit-template.txt
-# template-file = "~/.config/worktrunk/commit-template.txt"
-
-# Optional: Load squash template from file (mutually exclusive with 'squash-template')
-# Supports ~ expansion: ~/.config/worktrunk/squash-template.txt
-# squash-template-file = "~/.config/worktrunk/squash-template.txt"
-
+# ============================================================================
 # Custom Prompt Templates (Advanced)
+# ============================================================================
+# These options belong under [commit-generation] section above.
 # NOTE: Templates are synced from src/llm.rs by `cargo test readme_sync`
 
 # Optional: Custom prompt template (inline) - Uses minijinja syntax
