@@ -64,7 +64,7 @@ merge, cleanup.
 ```console
 $ wt list
   Branch     Status         HEAD±    main↕  Path              Remote⇅  Commit    Age   Message
-@ main           ^║                         ./repo               ║     b834638e  1d    Initial commit
+@ main           ^∥                         ./repo               ∥     b834638e  1d    Initial commit
 + feature-x  +   ↑        +5        ↑3      ./repo.feature-x           6bba16d6  1h    Add file 3
 + bugfix-y       ↑                  ↑1      ./repo.bugfix-y            bafa4cbd  2h    Fix bug
 

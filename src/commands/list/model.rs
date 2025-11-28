@@ -661,7 +661,7 @@ impl std::fmt::Display for UpstreamDivergence {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::None => Ok(()),
-            Self::InSync => write!(f, "║"),
+            Self::InSync => write!(f, "∥"),
             Self::Ahead => write!(f, "⇡"),
             Self::Behind => write!(f, "⇣"),
             Self::Diverged => write!(f, "⇅"),

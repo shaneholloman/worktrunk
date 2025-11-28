@@ -24,7 +24,7 @@ exit_code: 0
 
 ----- stderr -----
   [1mBranch[0m     [1mStatus[0m         [1mHEAD±[0m    [1mmain↕[0m  [1mPath[0m              [1mRemote⇅[0m  [1mCommit[0m    [1mAge[0m   [1mMessage[0m
-@ [1mmain[0m           [2m^[22m[2m║[22m                         [1m./repo[0m               [2m║[0m     [2mb834638e[0m  [2m1d[0m    [2mInitial commit[0m
+@ [1mmain[0m           [2m^[22m[2m∥[22m                         [1m./repo[0m               [2m∥[0m     [2mb834638e[0m  [2m1d[0m    [2mInitial commit[0m
 + feature-x  [36m+[39m   [2m↑[22m        [32m+5[0m        [32m↑3[0m      ./repo.feature-x           [2m6bba16d6[0m  [2m1h[0m    [2mAdd file 3[0m
 + bugfix-y       [2m↑[22m                  [32m↑1[0m      ./repo.bugfix-y            [2mbafa4cbd[0m  [2m2h[0m    [2mFix bug[0m
 

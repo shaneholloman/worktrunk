@@ -299,7 +299,7 @@ impl ColumnKind {
                 variant: DiffVariant::UpstreamArrows,
                 positive_style: ADDITION,
                 negative_style: DELETION.dimmed(),
-                always_show_zeros: false, // 0/0 case handled specially with ║ symbol
+                always_show_zeros: false, // 0/0 case handled specially with ∥ symbol
             }),
             _ => None,
         }

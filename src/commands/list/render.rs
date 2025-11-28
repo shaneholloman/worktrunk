@@ -610,7 +610,7 @@ impl ColumnLayout {
                 let Some((_, ahead, behind)) = ctx.upstream.active() else {
                     return StyledLine::new();
                 };
-                // Show centered ║ when in sync instead of ⇡0  ⇣0
+                // Show centered ∥ when in sync instead of ⇡0  ⇣0
                 // Note: This duplicates the InSync check from UpstreamDivergence, but
                 // checking counts directly is simpler than threading the enum through.
                 if ahead == 0 && behind == 0 {
@@ -618,7 +618,7 @@ impl ColumnLayout {
                     // Center the symbol in the column width
                     let padding_left = (self.width.saturating_sub(1)) / 2;
                     cell.push_raw(" ".repeat(padding_left));
-                    cell.push_styled("║", Style::new().dimmed());
+                    cell.push_styled("∥", Style::new().dimmed());
                     return cell;
                 }
                 self.render_diff_cell(ahead, behind)
