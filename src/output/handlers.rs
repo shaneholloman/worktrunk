@@ -48,8 +48,8 @@ fn format_switch_success_message(
 /// Why a branch is considered integrated into the target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IntegrationReason {
-    /// Branch is an ancestor of target (traditional merge)
-    Merged,
+    /// Branch has no marginal contribution to target (ancestor, merged back to base, etc.)
+    NoMarginalContribution,
     /// Branch's tree SHA matches target's tree SHA (squash merge/rebase)
     ContentsMatch,
 }
@@ -57,7 +57,7 @@ enum IntegrationReason {
 /// Check if a branch's content has been integrated into the target.
 ///
 /// Returns the reason if the branch is safe to delete:
-/// - `Merged`: The branch is an ancestor of the target (traditional merge)
+/// - `NoMarginalContribution`: The branch has no marginal contribution to target (ancestor, merged back, etc.)
 /// - `ContentsMatch`: The branch's tree SHA matches the target's tree SHA (squash merge/rebase)
 ///
 /// Returns None if neither condition is met, or if an error occurs (e.g., invalid refs).
@@ -68,9 +68,13 @@ fn get_integration_reason(
     branch_name: &str,
     target: &str,
 ) -> Option<IntegrationReason> {
-    // Check traditional merge relationship
-    if repo.is_ancestor(branch_name, target).unwrap_or(false) {
-        return Some(IntegrationReason::Merged);
+    // Check if branch has no marginal contribution to target (covers ancestors and merged-back-to-base)
+    // On error, conservatively assume branch HAS marginal contribution (won't delete)
+    if !repo
+        .has_marginal_contribution(branch_name, target)
+        .unwrap_or(true)
+    {
+        return Some(IntegrationReason::NoMarginalContribution);
     }
 
     // Check if tree content matches (handles squash merge/rebase)
@@ -161,7 +165,9 @@ fn get_flag_note(
     } else if let Some(target) = target_branch {
         // Show integration reason when branch is deleted (both wt merge and wt remove)
         match deletion_result {
-            Some(Some(IntegrationReason::Merged)) => format!(" (ancestor of {target})"),
+            Some(Some(IntegrationReason::NoMarginalContribution)) => {
+                format!(" (no marginal contribution to {target})")
+            }
             Some(Some(IntegrationReason::ContentsMatch)) => format!(" (contents match {target})"),
             Some(None) | None => String::new(),
         }

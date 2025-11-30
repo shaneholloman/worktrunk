@@ -901,10 +901,12 @@ branch `foo` has a different worktree at `repo.bar/`, an error is raised.
 
 ### Branch deletion
 
-By default, branches are deleted only when their content has been integrated:
+By default, branches are deleted only when their content is already in the target branch:
 
-- Traditional merge: branch is an ancestor of the target (git's `-d` behavior)
-- Squash merge/rebase: branch's tree SHA matches target's tree SHA
+- no changes beyond the common ancestor — `git diff --name-only target...branch` is empty:
+  no files changed between the merge base of `target`/`branch` and the tip of `branch`.
+- same content as target — `git rev-parse branch^{tree}` equals `git rev-parse target^{tree}`:
+  both branches point at the same tracked-files snapshot (tree), even if the commits differ.
 
 This handles workflows where PRs are squash-merged or rebased, which don't preserve
 commit ancestry but do integrate the content. Use `-D` to delete unintegrated
