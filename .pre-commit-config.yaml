@@ -62,5 +62,5 @@ repos:
 ci:
   # pre-commit.ci doesn't have Rust toolchain, so skip Rust-specific hooks.
   # Network access also isn't supported, so skip lychee.
-  skip: [fmt, clippy, lychee (PR mode)]
+  skip: [fmt, clippy, lychee]
   autoupdate_commit_msg: "chore: pre-commit autoupdate"
