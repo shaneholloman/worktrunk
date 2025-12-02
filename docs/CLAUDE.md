@@ -22,6 +22,23 @@ cd docs && zola serve
 
 If the server isn't already running, start it as a background process or in a separate terminal session before completing work. The user should be able to immediately see rendered changes without needing to manually start the server.
 
+### Visual Review Requirement
+
+**Always verify changes visually before returning to the user.** Use Playwright MCP (or similar browser automation) to:
+
+1. Navigate to the affected page(s)
+2. Take a snapshot or screenshot to verify the rendered output
+3. Check that changes meet the stated goal
+4. Iterate if the result doesn't match expectations
+
+This is non-negotiable for visual work. Code that "looks correct" often renders incorrectly due to CSS specificity, template inheritance, or responsive breakpoints. The feedback loop is: edit → view → assess → repeat until satisfied.
+
+Common issues to check:
+- Text actually appears where expected
+- Spacing and alignment look correct
+- No visual regressions on nearby elements
+- Responsive behavior at different viewport sizes (use `browser_resize`)
+
 **Always include the dev server link in your response** when returning to the user after making doc changes:
 
 ```
