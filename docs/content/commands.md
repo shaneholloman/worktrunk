@@ -7,7 +7,7 @@ weight = 6
 
 <!-- ⚠️ AUTO-GENERATED from `wt switch --help-md` — edit source to update -->
 
-```
+```bash
 wt switch — Switch to a worktree
 Usage: wt switch [OPTIONS] <BRANCH>
 
@@ -161,7 +161,7 @@ wt remove @                              # Remove current worktree
 
 <!-- ⚠️ AUTO-GENERATED from `wt merge --help-md` — edit source to update -->
 
-```
+```bash
 wt merge — Merge worktree into target branch
 Usage: wt merge [OPTIONS] [TARGET]
 
@@ -281,7 +281,7 @@ wt merge --no-verify
 
 <!-- ⚠️ AUTO-GENERATED from `wt remove --help-md` — edit source to update -->
 
-```
+```bash
 wt remove — Remove worktree and branch
 Usage: wt remove [OPTIONS] [WORKTREES]...
 
@@ -419,7 +419,7 @@ wt remove  # (when already in main worktree)
 
 <!-- ⚠️ AUTO-GENERATED from `wt list --help-md` — edit source to update -->
 
-```
+```bash
 wt list — List worktrees and optionally branches
 Usage: wt list [OPTIONS]
        wt list <COMMAND>
@@ -562,7 +562,7 @@ jq '.[] | select(.is_current == true)'
 
 <!-- ⚠️ AUTO-GENERATED from `wt config --help-md` — edit source to update -->
 
-```
+```bash
 wt config — Manage configuration and shell integration
 Usage: wt config [OPTIONS] <COMMAND>
 
@@ -662,7 +662,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 
 <!-- ⚠️ AUTO-GENERATED from `wt step --help-md` — edit source to update -->
 
-```
+```bash
 wt step — Workflow building blocks
 Usage: wt step [OPTIONS] <COMMAND>
 

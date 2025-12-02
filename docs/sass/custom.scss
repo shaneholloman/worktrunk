@@ -100,6 +100,13 @@ header {
     color: var(--wt-color-text);
 }
 
+// Navigation
+nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 // Navigation links
 .nav-item {
     font-size: 0.9rem;
@@ -113,6 +120,87 @@ header {
         color: var(--wt-color-text);
         background: var(--wt-color-bg-soft);
         text-decoration: none;
+    }
+}
+
+// ============================================================================
+// Search - Dropdown style (elasticlunr)
+// ============================================================================
+
+.search-container {
+    position: relative;
+    margin-right: 1rem;
+}
+
+#userinput {
+    width: 180px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    font-family: var(--wt-font-sans);
+    color: var(--wt-color-text);
+    background: var(--wt-color-bg);
+    border: 1px solid var(--wt-color-border-subtle);
+    border-radius: 0.5rem;
+    transition: width 150ms, border-color 150ms;
+
+    &::placeholder {
+        color: var(--wt-color-text-soft);
+    }
+
+    &:focus {
+        width: 240px;
+        border-color: var(--wt-color-accent);
+        outline: none;
+    }
+}
+
+#suggestions {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    width: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--wt-color-bg-elevated);
+    border: 1px solid var(--wt-color-border-subtle);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+}
+
+.search-result {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--wt-color-border-subtle);
+    text-decoration: none;
+    transition: background 150ms;
+
+    &:last-child {
+        border-bottom: none;
+    }
+
+    &:hover, &:focus {
+        background: var(--wt-color-bg-soft);
+        outline: none;
+    }
+}
+
+.search-title {
+    font-weight: 600;
+    color: var(--wt-color-text);
+    margin-bottom: 0.25rem;
+}
+
+.search-excerpt {
+    font-size: 0.85rem;
+    color: var(--wt-color-text-muted);
+    line-height: 1.4;
+
+    b {
+        color: var(--wt-color-text);
+        font-weight: 600;
     }
 }
 
@@ -542,6 +630,10 @@ ul > li::marker {
     header {
         padding: 10px 20px;
         height: auto;
+    }
+
+    .search-container {
+        display: none; // Hide search on mobile for now
     }
 
     main {

@@ -31,7 +31,6 @@
 <meta name="twitter:description" content="{{ config.extra.site_description }}">
 <!-- <meta name="twitter:image" content="{{ config.base_url }}social-card.png"> -->
 
-<link rel="stylesheet" href="{{ get_url(path='custom.css') }}">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-6YY8BDJ4QH"></script>
 <script>
@@ -62,6 +61,10 @@
     window.IntersectionObserver.prototype = RealIntersectionObserver.prototype;
 })();
 </script>
+<link rel="stylesheet" href="/custom.css">
+<script src="/elasticlunr.min.js" defer></script>
+<script src="/search_index.en.js" defer></script>
+<script src="/search.js" defer></script>
 {% endblock head %}
 
 {% block header %}
@@ -73,6 +76,10 @@
         </div>
     </a>
     <nav>
+        <div class="search-container">
+            <input id="userinput" type="search" placeholder="Search..." aria-label="Search documentation">
+            <div id="suggestions"></div>
+        </div>
         {% for menu in config.extra.juice_extra_menu %}
         <a class="nav-item subtitle-text" href="{{ menu.link | safe }}">{{ menu.title }}</a>
         {% endfor %}
