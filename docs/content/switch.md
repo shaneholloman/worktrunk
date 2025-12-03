@@ -6,11 +6,80 @@ weight = 10
 group = "Commands"
 +++
 
-## Operation
+Navigate between worktrees or create new ones. Switching to an existing worktree is just a directory change. With `--create`, a new branch and worktree are created, and hooks run.
 
-### Worktree resolution
+## Examples
 
-Arguments are resolved using **path-first lookup**:
+Switch to an existing worktree:
+
+```bash
+wt switch feature-auth
+```
+
+Create a new worktree for a fresh branch:
+
+```bash
+wt switch --create new-feature
+```
+
+Create from a specific base branch:
+
+```bash
+wt switch --create hotfix --base production
+```
+
+Switch to the previous worktree (like `cd -`):
+
+```bash
+wt switch -
+```
+
+## Creating Worktrees
+
+The `--create` flag (or `-c`) creates a new branch from the default branch (or `--base`), sets up a worktree at `../{repo}.{branch}`, runs [post-create hooks](/hooks/#post-create) synchronously, then spawns [post-start hooks](/hooks/#post-start) in the background before switching to the new directory.
+
+```bash
+# Create from main (default)
+wt switch --create api-refactor
+
+# Create from a specific branch
+wt switch --create emergency-fix --base release-2.0
+
+# Create and open in editor
+wt switch --create docs --execute "code ."
+
+# Skip all hooks
+wt switch --create temp --no-verify
+```
+
+## Shortcuts
+
+Special symbols for common targets:
+
+| Shortcut | Meaning |
+|----------|---------|
+| `-` | Previous worktree (like `cd -`) |
+| `@` | Current branch's worktree |
+| `^` | Default branch (main/master) |
+
+```bash
+wt switch -                              # Go back to previous worktree
+wt switch ^                              # Switch to main worktree
+wt switch --create bugfix --base=@       # Branch from current HEAD
+```
+
+## Hooks
+
+When creating a worktree (`--create`), hooks run in this order:
+
+1. **post-create** — Blocking, sequential. Typically: `npm install`, `cargo build`
+2. **post-start** — Background, parallel. Typically: dev servers, file watchers
+
+See [Hooks](/hooks/) for configuration details.
+
+## How Arguments Are Resolved
+
+Arguments resolve using **path-first lookup**:
 
 1. Compute the expected path for the argument (using the configured path template)
 2. If a worktree exists at that path, switch to it (regardless of what branch it's on)
@@ -20,94 +89,6 @@ Arguments are resolved using **path-first lookup**:
 
 - `wt switch foo` switches to `repo.foo/` (the `bar` branch worktree)
 - `wt switch bar` also works (falls back to branch lookup)
-
-### Switching to Existing Worktree
-
-- If worktree exists at expected path or for branch, changes directory via shell integration
-- No hooks run
-- No branch creation
-
-### Creating New Worktree (`--create`)
-
-1. Creates new branch (defaults to current default branch as base)
-2. Creates worktree in configured location (default: `../{{ main_worktree }}.{{ branch }}`)
-3. Runs post-create hooks sequentially (blocking)
-4. Shows success message
-5. Spawns post-start hooks in background (non-blocking)
-6. Changes directory to new worktree via shell integration
-
-## Hooks
-
-### post-create (sequential, blocking)
-
-- Run after worktree creation, before success message
-- Typically: `npm install`, `cargo build`, setup tasks
-- Failures block the operation
-- Skip with `--no-verify`
-
-### post-start (parallel, background)
-
-- Spawned after success message shown
-- Typically: dev servers, file watchers, editors
-- Run in background, failures logged but don't block
-- Logs: `.git/wt-logs/{branch}-post-start-{name}.log`
-- Skip with `--no-verify`
-
-**Template variables:** `{{ repo }}`, `{{ branch }}`, `{{ worktree }}`, `{{ repo_root }}`
-
-**Security:** Commands from project hooks require approval on first run.
-Approvals are saved to user config. Use `--force` to bypass prompts.
-See `wt config approvals --help`.
-
-## Examples
-
-Switch to existing worktree:
-
-```bash
-wt switch feature-branch
-```
-
-Create new worktree from main:
-
-```bash
-wt switch --create new-feature
-```
-
-Switch to previous worktree:
-
-```bash
-wt switch -
-```
-
-Create from specific base:
-
-```bash
-wt switch --create hotfix --base production
-```
-
-Create and run command:
-
-```bash
-wt switch --create docs --execute "code ."
-```
-
-Skip hooks during creation:
-
-```bash
-wt switch --create temp --no-verify
-```
-
-## Shortcuts
-
-Use `@` for current HEAD, `-` for previous, `^` for main:
-
-```bash
-wt switch @                              # Switch to current branch's worktree
-wt switch -                              # Switch to previous worktree
-wt switch --create new-feature --base=^  # Branch from main (default)
-wt switch --create bugfix --base=@       # Branch from current HEAD
-wt remove @                              # Remove current worktree
-```
 
 ---
 
