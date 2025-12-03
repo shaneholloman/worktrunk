@@ -688,24 +688,63 @@ pub fn handle_cache_clear(cache_type: Option<String>) -> anyhow::Result<()> {
                 crate::output::info("No default branch cache to clear")?;
             }
         }
+        Some("logs") => {
+            let cleared = clear_logs(&repo)?;
+            if cleared == 0 {
+                crate::output::info("No logs to clear")?;
+            } else {
+                crate::output::success(cformat!(
+                    "Cleared <bold>{cleared}</> log file{}",
+                    if cleared == 1 { "" } else { "s" }
+                ))?;
+            }
+        }
         None => {
             let cleared_default = repo
                 .run_command(&["config", "--unset", "worktrunk.defaultBranch"])
                 .is_ok();
             let cleared_ci = CachedCiStatus::clear_all(&repo) > 0;
+            let cleared_logs = clear_logs(&repo)? > 0;
 
-            if cleared_default || cleared_ci {
+            if cleared_default || cleared_ci || cleared_logs {
                 crate::output::success("Cleared all caches")?;
             } else {
                 crate::output::info("No caches to clear")?;
             }
         }
         Some(unknown) => {
-            anyhow::bail!("Unknown cache type: {unknown}. Valid types: ci, default-branch");
+            anyhow::bail!("Unknown cache type: {unknown}. Valid types: ci, default-branch, logs");
         }
     }
 
     Ok(())
+}
+
+/// Clear all log files from the wt-logs directory
+fn clear_logs(repo: &Repository) -> anyhow::Result<usize> {
+    let git_common_dir = repo.git_common_dir()?;
+    let log_dir = git_common_dir.join("wt-logs");
+
+    if !log_dir.exists() {
+        return Ok(0);
+    }
+
+    let mut cleared = 0;
+    for entry in std::fs::read_dir(&log_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "log") {
+            std::fs::remove_file(&path)?;
+            cleared += 1;
+        }
+    }
+
+    // Remove the directory if empty
+    if std::fs::read_dir(&log_dir)?.next().is_none() {
+        let _ = std::fs::remove_dir(&log_dir);
+    }
+
+    Ok(cleared)
 }
 
 /// Handle the cache refresh command (refreshes default branch)

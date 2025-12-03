@@ -133,8 +133,79 @@ fn test_config_cache_clear_unknown_type() {
     assert!(!output.status.success());
     assert_snapshot!(String::from_utf8_lossy(&output.stderr), @r"
     [1m[31merror:[0m invalid value '[1m[33munknown[0m' for '[1m[36m[CACHE_TYPE][0m'
-      [possible values: [1m[32mci[0m, [1m[32mdefault-branch[0m]
+      [possible values: [1m[32mci[0m, [1m[32mdefault-branch[0m, [1m[32mlogs[0m]
 
     For more information, try '[1m[36m--help[0m'.
     ");
+}
+
+#[test]
+fn test_config_cache_clear_logs_empty() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    let output = wt_config_cache_cmd(&repo, &["clear", "logs"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_snapshot!(String::from_utf8_lossy(&output.stderr), @"⚪ No logs to clear");
+}
+
+#[test]
+fn test_config_cache_clear_logs_with_files() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create wt-logs directory with some log files
+    let git_dir = repo.root_path().join(".git");
+    let log_dir = git_dir.join("wt-logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    std::fs::write(log_dir.join("feature-post-start-npm.log"), "npm output").unwrap();
+    std::fs::write(log_dir.join("bugfix-remove.log"), "remove output").unwrap();
+
+    let output = wt_config_cache_cmd(&repo, &["clear", "logs"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_snapshot!(String::from_utf8_lossy(&output.stderr), @"✅ [32mCleared [1m2[22m log files[39m");
+
+    // Verify logs are gone
+    assert!(!log_dir.exists());
+}
+
+#[test]
+fn test_config_cache_clear_logs_single_file() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create wt-logs directory with one log file
+    let git_dir = repo.root_path().join(".git");
+    let log_dir = git_dir.join("wt-logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    std::fs::write(log_dir.join("feature-remove.log"), "remove output").unwrap();
+
+    let output = wt_config_cache_cmd(&repo, &["clear", "logs"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_snapshot!(String::from_utf8_lossy(&output.stderr), @"✅ [32mCleared [1m1[22m log file[39m");
+}
+
+#[test]
+fn test_config_cache_clear_all_with_logs() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create wt-logs directory with a log file
+    let git_dir = repo.root_path().join(".git");
+    let log_dir = git_dir.join("wt-logs");
+    std::fs::create_dir_all(&log_dir).unwrap();
+    std::fs::write(log_dir.join("feature-remove.log"), "remove output").unwrap();
+
+    let output = wt_config_cache_cmd(&repo, &["clear"]).output().unwrap();
+    assert!(output.status.success());
+    assert_snapshot!(String::from_utf8_lossy(&output.stderr), @"✅ [32mCleared all caches[39m");
+
+    // Verify logs are gone
+    assert!(!log_dir.exists());
 }

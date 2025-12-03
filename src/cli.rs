@@ -396,8 +396,8 @@ CI cache entries show status, age, and the commit SHA they were fetched for."#)]
 
     /// Clear cached data
     Clear {
-        /// Cache type: 'ci' or 'default-branch' (omit for all)
-        #[arg(value_parser = ["ci", "default-branch"])]
+        /// Cache type: 'ci', 'default-branch', or 'logs' (default: all)
+        #[arg(value_parser = ["ci", "default-branch", "logs"])]
         cache_type: Option<String>,
     },
 
