@@ -138,8 +138,44 @@ Without shell integration, `wt switch` prints the target directory but cannot `c
 
 ## Environment Variables
 
+All user config options can be overridden with environment variables using the `WORKTRUNK_` prefix.
+
+### Naming convention
+
+Config keys use kebab-case (`worktree-path`), while env vars use SCREAMING_SNAKE_CASE (`WORKTRUNK_WORKTREE_PATH`). The conversion happens automatically.
+
+For nested config sections, use double underscores to separate levels:
+
+| Config | Environment Variable |
+|--------|---------------------|
+| `worktree-path` | `WORKTRUNK_WORKTREE_PATH` |
+| `commit-generation.command` | `WORKTRUNK_COMMIT_GENERATION__COMMAND` |
+| `commit-generation.args` | `WORKTRUNK_COMMIT_GENERATION__ARGS` |
+
+Note the single underscore after `WORKTRUNK` and double underscores between nested keys.
+
+### Array values
+
+Array config values like `args = ["-m", "claude-haiku"]` can be specified as a single string in environment variables:
+
+```bash
+export WORKTRUNK_COMMIT_GENERATION__ARGS="-m claude-haiku"
+```
+
+### Example: CI/testing override
+
+Override the LLM command in CI to use a mock:
+
+```bash
+WORKTRUNK_COMMIT_GENERATION__COMMAND=echo \
+WORKTRUNK_COMMIT_GENERATION__ARGS="test: automated commit" \
+  wt merge
+```
+
+### Special variables
+
 | Variable | Purpose |
 |----------|---------|
-| `WORKTRUNK_CONFIG_PATH` | Override user config location |
+| `WORKTRUNK_CONFIG_PATH` | Override user config file location (not a config key) |
 | `NO_COLOR` | Disable colored output ([standard](https://no-color.org/)) |
 | `CLICOLOR_FORCE` | Force colored output even when not a TTY |

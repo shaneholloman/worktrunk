@@ -261,6 +261,23 @@ wt config --help      # Show LLM setup guide
 - **macOS/Linux**: `~/.config/worktrunk/config.toml` (or `$XDG_CONFIG_HOME/worktrunk/config.toml`)
 - **Windows**: `%APPDATA%\worktrunk\config.toml`
 
+## Environment Variable Overrides
+
+All config options can be overridden via environment variables with the `WORKTRUNK_` prefix:
+
+- Single underscore after prefix: `WORKTRUNK_WORKTREE_PATH`
+- Double underscore for nested keys: `WORKTRUNK_COMMIT_GENERATION__COMMAND`
+- Snake_case env vars convert to kebab-case config keys automatically
+
+```bash
+# Override LLM in CI/testing
+WORKTRUNK_COMMIT_GENERATION__COMMAND=echo \
+WORKTRUNK_COMMIT_GENERATION__ARGS="test: mock commit" \
+  wt merge
+```
+
+Array values like `args` can be specified as single strings in env vars.
+
 ## Example Config
 
 See `dev/config.example.toml` in the worktrunk repository for a complete annotated example.
