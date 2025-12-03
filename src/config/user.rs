@@ -276,7 +276,10 @@ impl WorktrunkConfig {
 
         // Add environment variables with WORKTRUNK prefix
         // Uses "__" separator (default) to support field names with underscores
-        // Example: WORKTRUNK_COMMIT_GENERATION__COMMAND maps to commit-generation.command
+        // TODO: This doesn't work for nested fields due to serde rename mismatch.
+        // The config crate maps WORKTRUNK_COMMIT_GENERATION__COMMAND to `commit_generation.command`
+        // (snake_case), but serde expects `commit-generation.command` (kebab-case).
+        // Only WORKTRUNK_CONFIG_PATH works reliably (handled separately in get_config_path).
         builder = builder.add_source(config::Environment::with_prefix("WORKTRUNK").separator("__"));
 
         let config: Self = builder.build()?.try_deserialize()?;
