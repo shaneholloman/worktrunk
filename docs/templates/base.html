@@ -16,11 +16,20 @@
 {# _variables.html is already included by the theme at line 12 of juice/templates/index.html #}
 {# Zola resolves it to our custom templates/_variables.html, so no need to include it again #}
 <script>
-// iOS viewport height fix: Capture a STABLE height once on page load.
-// Do NOT update on resize/scroll - that's what causes the jank!
-// On Firefox iOS and Chrome iOS, svh/lvh behave like dvh due to missing
-// minimumViewportInset/maximumViewportInset WebKit APIs.
-// See: https://github.com/mozilla-mobile/firefox-ios/issues/11574
+// iOS viewport jank fix: Firefox/Chrome iOS have broken svh/lvh units that
+// behave like dvh, causing the hero to resize when browser chrome appears.
+// Root cause: Missing WebKit minimumViewportInset/maximumViewportInset APIs.
+// https://github.com/mozilla-mobile/firefox-ios/issues/11574
+//
+// Solution: Capture height ONCE on load, set --vh-full CSS variable.
+// CSS uses var(--vh-full, 100lvh) so iOS gets stable pixels, others get lvh.
+//
+// What didn't work:
+// - Pure 100lvh: janks on Firefox iOS (lvh broken too)
+// - -webkit-fill-available: overridden by media queries / didn't help
+// - Updating on resize/visualViewport events: made jank WORSE
+//
+// TODO: Simplify if Firefox iOS ever fixes their WebKit wrapper.
 (function() {
     // Only run on iOS WebKit browsers
     var isIOS = /iP(hone|ad|od)/.test(navigator.platform) ||

@@ -66,29 +66,7 @@ When either variable changes (including via media queries), all dependent values
 3. **IntersectionObserver intercept** - Disables Juice's scroll-spy which conflicts with our TOC styling
 4. **Logo preload** - Prevents flash when navigating between pages
 5. **WCAG AA colors** - `--wt-color-text-soft` is #78716a for 4.5:1 contrast
-6. **iOS viewport polyfill** - Sets stable `--vh-full` variable for Firefox iOS and Chrome iOS
-
-### iOS mobile viewport jank (known issue)
-
-**Problem**: On Firefox iOS and Chrome iOS, scrolling causes the browser chrome (URL bar) to appear/disappear, which triggers viewport height changes. The modern CSS viewport units (`svh`, `lvh`) that should handle this are broken on these browsers - they behave like `dvh` (dynamic), causing visible "jank" where the hero section resizes during scroll.
-
-**Root cause**: Firefox iOS and Chrome iOS use WKWebView but haven't implemented the `minimumViewportInset`/`maximumViewportInset` WebKit APIs that make `svh`/`lvh` work correctly. See: https://github.com/mozilla-mobile/firefox-ios/issues/11574
-
-**Current workaround** (in `templates/base.html` and `sass/custom.scss`):
-1. JS captures `window.innerHeight` once on page load and sets `--vh-full` CSS variable
-2. JS only runs on iOS browsers (detected via user agent)
-3. JS only updates on `orientationchange`, never on scroll/resize
-4. CSS uses `var(--vh-full, 100lvh)` - iOS gets the stable JS value, other browsers get `lvh`
-
-**What we tried that didn't work**:
-- Pure `100lvh` without JS - janks on Firefox iOS (lvh is broken there too)
-- `-webkit-fill-available` in `@supports` block - either didn't help or was overridden by media queries
-- JS that updates on `resize`/`visualViewport.resize` - made jank WORSE by actively tracking the dynamic viewport
-- Complex polyfills with multiple height candidates - added complexity without benefit
-
-**What we'd prefer**: A simpler CSS-only solution. The current JS workaround is fragile and adds complexity. If a future browser update fixes `lvh` on Firefox iOS, or if a better CSS approach emerges, we should simplify.
-
-**Testing**: Safari iOS doesn't have this issue (its browser chrome doesn't appear/disappear on scroll the same way). Chrome iOS has the appearing chrome but our fix handles it. Firefox iOS is the most problematic.
+6. **iOS viewport polyfill** - Sets stable `--vh-full` variable for Firefox iOS/Chrome iOS (see `templates/base.html` for details on the jank issue and what we tried)
 
 ### Responsive breakpoints
 

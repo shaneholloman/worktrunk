@@ -21,8 +21,8 @@ body {
     line-height: 1.5;
     color: var(--wt-color-text);
     background-color: var(--wt-color-bg);
-    // Override Juice theme's min-height: 100vh. Use lvh (large viewport height)
-    // which is stable on Firefox iOS, unlike svh which behaves like dvh.
+    // iOS viewport jank fix: --vh-full is set by JS in base.html for iOS browsers.
+    // Fallback to 100lvh for other browsers. See base.html for full explanation.
     min-height: var(--vh-full, 100lvh);
 }
 
@@ -520,7 +520,7 @@ table {
     border: 1px solid var(--wt-color-border-subtle);
     border-top: 3px solid var(--wt-color-accent);
     padding: 0.75rem 0 1rem;
-    // Use lvh which is stable on Firefox iOS (svh behaves like dvh there)
+    // iOS jank fix: --vh-full set by JS, fallback to lvh. See base.html.
     max-height: calc(var(--vh-full, 100lvh) - var(--wt-header-height) - var(--wt-main-padding-top) - 20px);
     overflow-y: auto;
     overscroll-behavior: contain; // Trap scroll events within TOC
@@ -660,9 +660,7 @@ footer {
     background: radial-gradient(ellipse 80% 60% at 70% 40%, rgba(254, 243, 199, 0.7) 0%, transparent 60%),
                 radial-gradient(ellipse 50% 40% at 30% 70%, rgba(251, 243, 219, 0.5) 0%, transparent 50%),
                 var(--wt-color-bg-soft) !important;
-    // Use lvh (large viewport height) which is stable on Firefox iOS.
-    // Firefox iOS incorrectly implements svh as dvh, causing scroll jank.
-    // See: https://github.com/mozilla-mobile/firefox-ios/issues/11574
+    // iOS jank fix: --vh-full set by JS, fallback to lvh. See base.html.
     height: calc(var(--vh-full, 100lvh) - var(--wt-header-height) - env(safe-area-inset-top, 0px)) !important;
     max-height: calc(var(--vh-full, 100lvh) - var(--wt-header-height) - env(safe-area-inset-top, 0px)) !important;
     padding: 4rem 40px 3rem;
@@ -680,7 +678,7 @@ footer {
     }
 
     .hero-image {
-        // Use lvh which is stable on Firefox iOS (svh behaves like dvh there)
+        // iOS jank fix: --vh-full set by JS, fallback to lvh. See base.html.
         max-height: calc(var(--vh-full, 100lvh) * 0.55);
         width: auto;
         aspect-ratio: 1;
@@ -878,7 +876,7 @@ ul > li::marker {
     top: calc(var(--wt-header-height) + env(safe-area-inset-top, 0px));
     left: 0;
     width: min(260px, 70vw);
-    // Use lvh which is stable on Firefox iOS (svh behaves like dvh there)
+    // iOS jank fix: --vh-full set by JS, fallback to lvh. See base.html.
     height: calc(var(--vh-full, 100lvh) - var(--wt-header-height) - env(safe-area-inset-top, 0px));
     background: var(--wt-color-bg-elevated);
     border-right: 1px solid var(--wt-color-border-subtle);
@@ -1010,8 +1008,7 @@ body.mobile-menu-open {
     }
 
     .hero {
-        // Use lvh (large viewport height) which should be stable on Firefox iOS
-        // unlike svh which incorrectly behaves like dvh
+        // iOS jank fix: --vh-full set by JS, fallback to lvh. See base.html.
         height: calc(var(--vh-full, 100lvh) - var(--wt-header-height) - env(safe-area-inset-top, 0px));
         padding: 2rem 20px;
         flex-direction: column;
