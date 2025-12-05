@@ -303,6 +303,7 @@ main {
 .content figure.demo {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    margin-top: 0.25rem; // Minimal gap after intro text
 
     img {
         min-width: 800px; // Shrink until readable, then scroll
