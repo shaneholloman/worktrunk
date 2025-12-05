@@ -10,7 +10,9 @@ group = "Commands"
 
 Interactive worktree picker with live preview. Navigate worktrees with keyboard shortcuts and press Enter to switch.
 
-![wt select demo](/assets/wt-select.gif)
+<figure class="demo">
+<img src="/assets/wt-select.gif" alt="wt select demo">
+</figure>
 
 ## Examples
 

@@ -300,8 +300,8 @@ fn colorize_ci_status_for_html(text: &str) -> String {
 
 /// Expand demo GIF placeholders for web docs.
 ///
-/// Transforms `<!-- demo: filename.gif -->` into `![wt command demo](/assets/filename.gif)`.
-/// The HTML comment is invisible in terminal --help output, but expands to a markdown image
+/// Transforms `<!-- demo: filename.gif -->` into an HTML figure with the `demo` class.
+/// The HTML comment is invisible in terminal --help output, but expands to a styled figure
 /// for web docs generated via --help-page.
 fn expand_demo_placeholders(text: &str) -> String {
     const PREFIX: &str = "<!-- demo: ";
@@ -314,7 +314,10 @@ fn expand_demo_placeholders(text: &str) -> String {
             let filename = &result[after_prefix..after_prefix + end_offset];
             // Extract command name from filename (e.g., "wt-select.gif" -> "wt select")
             let alt_text = filename.trim_end_matches(".gif").replace('-', " ");
-            let replacement = format!("![{alt_text} demo](/assets/{filename})");
+            // Use figure.demo class for proper mobile styling (no shrink, horizontal scroll)
+            let replacement = format!(
+                "<figure class=\"demo\">\n<img src=\"/assets/{filename}\" alt=\"{alt_text} demo\">\n</figure>"
+            );
             let end = after_prefix + end_offset + SUFFIX.len();
             result.replace_range(start..end, &replacement);
         } else {

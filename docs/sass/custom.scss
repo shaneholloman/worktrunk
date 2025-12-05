@@ -299,6 +299,16 @@ main {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
+// Demo GIFs - shrink to min-width, then horizontal scroll
+.content figure.demo {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    img {
+        min-width: 800px; // Shrink until readable, then scroll
+    }
+}
+
 // Tighten spacing between paragraphs and code blocks
 .content p + pre,
 .content p + .terminal,
@@ -1230,7 +1240,7 @@ header nav .nav-item {
 
 // Code block hover glow - enhance the existing shadow
 .content pre {
-    transition: box-shadow 100ms ease;
+    transition: box-shadow 50ms;
 
     &:hover {
         box-shadow: 0 0 0 1px var(--wt-color-accent-soft),
