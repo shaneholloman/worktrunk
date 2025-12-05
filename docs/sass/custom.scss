@@ -94,13 +94,13 @@ h4 {
 
 header {
     // Height includes safe-area-inset so content isn't compressed on notched devices
-    height: calc(var(--wt-header-height) + env(safe-area-inset-top, 0px));
+    height: calc(var(--wt-header-height) + var(--safe-area-top, env(safe-area-inset-top, 0px)));
     box-sizing: border-box; // Include border in height
     background-color: var(--wt-color-bg-soft) !important;
     border-bottom: 1px solid var(--wt-color-border-subtle);
     padding: 0 50px;
     // iOS safe area: push content below notch/Dynamic Island
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: var(--safe-area-top, env(safe-area-inset-top, 0px));
     box-shadow: none !important;
     position: sticky;
     top: 0;
@@ -126,7 +126,7 @@ header {
         right: 0;
         // Cover safe area inset plus header height so the browser chrome
         // always samples this solid color, not scrolling content beneath
-        height: calc(env(safe-area-inset-top) + var(--wt-header-height));
+        height: calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + var(--wt-header-height));
         background: var(--wt-color-bg-soft);
         // Below header (201) so header remains interactive
         z-index: 200;
@@ -666,8 +666,8 @@ footer {
     // when browser chrome appears/disappears. The JS fix sets --vh-full from
     // window.innerHeight on load, providing a stable value.
     // See: https://github.com/mozilla-mobile/firefox-ios/issues/11574
-    height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - env(safe-area-inset-top, 0px)) !important;
-    max-height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - env(safe-area-inset-top, 0px)) !important;
+    height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - var(--safe-area-top, env(safe-area-inset-top, 0px))) !important;
+    max-height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - var(--safe-area-top, env(safe-area-inset-top, 0px))) !important;
     padding: 4rem 40px 3rem;
     position: relative;
     display: flex;
@@ -878,11 +878,11 @@ ul > li::marker {
     display: none;
     position: fixed;
     // Position below header (which may include safe-area-inset on iOS)
-    top: calc(var(--wt-header-height) + env(safe-area-inset-top, 0px));
+    top: calc(var(--wt-header-height) + var(--safe-area-top, env(safe-area-inset-top, 0px)));
     left: 0;
     width: min(260px, 70vw);
     // Use --vh-full (JS-set) with svh fallback for Firefox/Chrome iOS fix
-    height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - env(safe-area-inset-top, 0px));
+    height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - var(--safe-area-top, env(safe-area-inset-top, 0px)));
     background: var(--wt-color-bg-elevated);
     border-right: 1px solid var(--wt-color-border-subtle);
     z-index: 200;
@@ -979,10 +979,10 @@ body.mobile-menu-open {
 
     header {
         // Height includes safe-area-inset so content isn't compressed
-        height: calc(var(--wt-header-height) + env(safe-area-inset-top, 0px));
+        height: calc(var(--wt-header-height) + var(--safe-area-top, env(safe-area-inset-top, 0px)));
         padding: 10px 20px;
         // Push content below notch/Dynamic Island
-        padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+        padding-top: calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 10px);
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -1014,7 +1014,7 @@ body.mobile-menu-open {
 
     .hero {
         // Use --vh-full (JS-set) with svh fallback for Firefox/Chrome iOS fix
-        height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - env(safe-area-inset-top, 0px));
+        height: calc(var(--vh-full, 100svh) - var(--wt-header-height) - var(--safe-area-top, env(safe-area-inset-top, 0px)));
         padding: 2rem 20px;
         flex-direction: column;
         gap: 2rem;

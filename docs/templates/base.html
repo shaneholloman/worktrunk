@@ -29,18 +29,32 @@
     var root = document.documentElement;
     root.classList.add('ios-vh-lock'); // Debug: visible indicator
 
-    function setLockedVH() {
-        // visualViewport.height is more accurate on some devices
+    function setLockedValues() {
+        // Lock viewport height
         var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
         root.style.setProperty('--vh-full', Math.round(h) + 'px');
-        console.log('[vh-lock] Set --vh-full to ' + h + 'px');
+
+        // Lock safe-area-inset-top by reading computed value once
+        // env() values may fluctuate during toolbar animation on Firefox iOS
+        var testEl = document.createElement('div');
+        testEl.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);visibility:hidden';
+        document.body.appendChild(testEl);
+        var safeTop = testEl.offsetTop;
+        document.body.removeChild(testEl);
+        root.style.setProperty('--safe-area-top', safeTop + 'px');
+
+        console.log('[vh-lock] --vh-full=' + h + 'px, --safe-area-top=' + safeTop + 'px');
     }
 
-    // Set immediately
-    setLockedVH();
+    // Set immediately (need to wait for body)
+    if (document.body) {
+        setLockedValues();
+    } else {
+        document.addEventListener('DOMContentLoaded', setLockedValues);
+    }
     // Re-set on bfcache restore and orientation change
-    window.addEventListener('pageshow', setLockedVH, { passive: true });
-    window.addEventListener('orientationchange', setLockedVH, { passive: true });
+    window.addEventListener('pageshow', setLockedValues, { passive: true });
+    window.addEventListener('orientationchange', setLockedValues, { passive: true });
 })();
 </script>
 <meta name="view-transition" content="same-origin">
