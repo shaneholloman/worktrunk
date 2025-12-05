@@ -38,9 +38,9 @@ Worktrunk makes worktrees easy to use — branch-based navigation, unified statu
 | Clean up | `wt remove` | `cd ../repo && git worktree remove ../repo.feature && git branch -d feature` |
 | List with status | `wt list` | `git worktree list` (paths only) |
 
-- **[Lifecycle hooks](https://worktrunk.dev/hooks/)** — run commands on create, switch, merge (deps install, dev servers, test suites)
-- **[LLM commit messages](https://worktrunk.dev/llm-commits/)** — generate commits from diffs via [llm](https://llm.datasette.io/)
-- **[Merge workflow](https://worktrunk.dev/merge/)** — squash, rebase, push, clean up in one command
+- **[Lifecycle hooks](https://worktrunk.dev/hooks/)** — run commands on create, pre-merge, post-merge
+- **[LLM commit messages](https://worktrunk.dev/llm-commits/)** — generate commit messages from diffs via [llm](https://llm.datasette.io/)
+- **[Merge workflow](https://worktrunk.dev/merge/)** — squash, rebase, merge, clean up in one command
 
 ## In practice
 
@@ -109,9 +109,9 @@ $ wt config shell install
 
 ## Next steps
 
-- Learn the core commands: [wt switch](https://worktrunk.dev/switch/), [wt list](https://worktrunk.dev/list/), [wt remove](https://worktrunk.dev/remove/)
+- Learn the core commands: [wt switch](https://worktrunk.dev/switch/), [wt list](https://worktrunk.dev/list/), [wt merge](https://worktrunk.dev/merge/), [wt remove](https://worktrunk.dev/remove/)
 - Set up [project hooks](https://worktrunk.dev/hooks/) for automated setup
-- Explore [LLM commit messages](https://worktrunk.dev/llm-commits/), [local merging](https://worktrunk.dev/merge/), [fzf-like picker](https://worktrunk.dev/select/), [Claude Code integration](https://worktrunk.dev/claude-code/)
+- Explore [LLM commit messages](https://worktrunk.dev/llm-commits/), [fzf-like picker](https://worktrunk.dev/select/), [Claude Code integration](https://worktrunk.dev/claude-code/)
 
 ## Further reading
 
