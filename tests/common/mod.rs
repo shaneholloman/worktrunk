@@ -35,6 +35,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
+use worktrunk::config::sanitize_branch_name;
 
 /// Time constants for `commit_with_age()` - use as `5 * MINUTE`, `2 * HOUR`, etc.
 pub const MINUTE: i64 = 60;
@@ -419,8 +420,7 @@ impl TestRepo {
     /// The worktree path follows the default template format: `repo.{branch}`
     /// (sanitized, with slashes replaced by dashes).
     pub fn add_worktree(&mut self, branch: &str) -> PathBuf {
-        // Sanitize branch name the same way the template does (see src/config/expansion.rs)
-        let safe_branch = branch.replace(['/', '\\'], "-");
+        let safe_branch = sanitize_branch_name(branch);
         // Use default template path format: ../{{ main_worktree }}.{{ branch }}
         // From {temp_dir}/repo, this resolves to {temp_dir}/repo.{branch}
         let worktree_path = self.temp_dir.path().join(format!("repo.{}", safe_branch));

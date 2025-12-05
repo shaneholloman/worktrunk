@@ -5,6 +5,15 @@
 //! Automatically updates sections when out of sync.
 //!
 //! Run with: `cargo test --test integration readme_sync`
+//!
+//! ## Architecture
+//!
+//! The sync system uses a unified pipeline:
+//!
+//! 1. **Parsing**: `parse_snapshot_raw()` extracts stdout/stderr from snapshot files
+//! 2. **Placeholders**: `replace_placeholders()` normalizes test paths to display paths
+//! 3. **Formatting**: `OutputFormat` enum controls the final output (plain text vs HTML)
+//! 4. **Updating**: `update_section()` finds markers and replaces content
 
 use ansi_to_html::convert as ansi_to_html;
 use regex::Regex;
@@ -78,6 +87,169 @@ static RUST_RAW_STRING_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r##"(?s)const (DEFAULT_TEMPLATE|DEFAULT_SQUASH_TEMPLATE): &str = r#"(.*?)"#;"##)
         .unwrap()
 });
+
+// =============================================================================
+// Unified Template Infrastructure
+// =============================================================================
+
+/// Raw snapshot content with stdout/stderr separated
+struct SnapshotContent {
+    stdout: String,
+    stderr: String,
+}
+
+/// Output format for section updates
+enum OutputFormat {
+    /// README: plain text in ```console``` code block
+    Readme,
+    /// Docs: HTML with ANSI colors in {% terminal() %} shortcode
+    DocsHtml,
+    /// Help: rendered markdown (no wrapper)
+    Help,
+}
+
+/// Parse a snapshot file into raw stdout/stderr components
+///
+/// Handles:
+/// - YAML front matter removal
+/// - insta_cmd stdout/stderr section extraction
+/// - Malformed snapshots (returns empty sections rather than erroring)
+fn parse_snapshot_raw(content: &str) -> SnapshotContent {
+    // Remove YAML front matter
+    let content = if content.starts_with("---") {
+        let parts: Vec<&str> = content.splitn(3, "---").collect();
+        if parts.len() >= 3 {
+            parts[2].trim().to_string()
+        } else {
+            content.to_string()
+        }
+    } else {
+        content.to_string()
+    };
+
+    // Handle insta_cmd format with stdout/stderr sections
+    if content.contains("----- stdout -----") {
+        let stdout = extract_section(&content, "----- stdout -----\n", "----- stderr -----");
+        let stderr = extract_section(&content, "----- stderr -----\n", "----- ");
+        SnapshotContent { stdout, stderr }
+    } else {
+        // Plain content goes to stdout
+        SnapshotContent {
+            stdout: content,
+            stderr: String::new(),
+        }
+    }
+}
+
+/// Extract a section between start marker and end marker
+///
+/// Returns empty string if start marker not found.
+/// If end marker missing, returns content from start marker to EOF.
+fn extract_section(content: &str, start_marker: &str, end_marker: &str) -> String {
+    if let Some(start) = content.find(start_marker) {
+        let after_header = &content[start + start_marker.len()..];
+        if let Some(end) = after_header.find(end_marker) {
+            after_header[..end].trim_end().to_string()
+        } else {
+            after_header.trim_end().to_string()
+        }
+    } else {
+        String::new()
+    }
+}
+
+/// Replace test placeholders with display-friendly values
+///
+/// Transforms:
+/// - `[HASH]` → `a1b2c3d`
+/// - `[TMPDIR]/repo.branch` → `../repo.branch`
+/// - `[TMPDIR]/repo` → `../repo`
+/// - `[REPO]` → `../repo`
+fn replace_placeholders(content: &str) -> String {
+    let content = HASH_REGEX.replace_all(content, "a1b2c3d");
+    let content = TMPDIR_BRANCH_REGEX.replace_all(&content, "../repo.$1");
+    let content = TMPDIR_MAIN_REGEX.replace_all(&content, "../repo$1");
+    REPO_REGEX.replace_all(&content, "../repo").into_owned()
+}
+
+/// Format replacement content based on output format
+fn format_replacement(id: &str, content: &str, format: &OutputFormat) -> String {
+    match format {
+        OutputFormat::Readme => {
+            format!(
+                "<!-- ⚠️ AUTO-GENERATED from {} — edit source to update -->\n\n```console\n{}\n```\n\n<!-- END AUTO-GENERATED -->",
+                id, content
+            )
+        }
+        OutputFormat::DocsHtml => {
+            format!(
+                "<!-- ⚠️ AUTO-GENERATED-HTML from {} — edit source to update -->\n\n{{% terminal() %}}\n{}\n{{% end %}}\n\n<!-- END AUTO-GENERATED -->",
+                id, content
+            )
+        }
+        OutputFormat::Help => {
+            format!(
+                "<!-- ⚠️ AUTO-GENERATED from `{}` — edit source to update -->\n\n{}\n\n<!-- END AUTO-GENERATED -->",
+                id, content
+            )
+        }
+    }
+}
+
+/// Update sections matching a pattern in content
+///
+/// Unified function for all section types. The `get_replacement` closure
+/// receives (id, current_content) and returns the new content.
+fn update_section(
+    content: &str,
+    pattern: &Regex,
+    format: OutputFormat,
+    get_replacement: impl Fn(&str, &str) -> Result<String, String>,
+) -> Result<(String, usize, usize), Vec<String>> {
+    let mut result = content.to_string();
+    let mut errors = Vec::new();
+    let mut updated = 0;
+
+    // Collect all matches first (to avoid borrowing issues)
+    let matches: Vec<_> = pattern
+        .captures_iter(content)
+        .map(|cap| {
+            let full_match = cap.get(0).unwrap();
+            let id = cap.get(1).unwrap().as_str().to_string();
+            let current = trim_lines(cap.get(2).unwrap().as_str());
+            (full_match.start(), full_match.end(), id, current)
+        })
+        .collect();
+
+    let total = matches.len();
+
+    // Process in reverse order to preserve positions
+    for (start, end, id, current) in matches.into_iter().rev() {
+        let expected = match get_replacement(&id, &current) {
+            Ok(content) => content,
+            Err(e) => {
+                errors.push(format!("❌ {}: {}", id, e));
+                continue;
+            }
+        };
+
+        if current != expected {
+            let replacement = format_replacement(&id, &expected, &format);
+            result.replace_range(start..end, &replacement);
+            updated += 1;
+        }
+    }
+
+    if errors.is_empty() {
+        Ok((result, updated, total))
+    } else {
+        Err(errors)
+    }
+}
+
+// =============================================================================
+// End Unified Infrastructure
+// =============================================================================
 
 /// Regex to find command placeholder comments in help pages
 /// Matches: <!-- wt <args> -->\n```bash\n$ wt <args>\n```
@@ -277,56 +449,11 @@ fn parse_snapshot_with_command(
     })
 }
 
-/// Parse content from snapshot file content
+/// Parse snapshot content for README (plain text, combined stdout/stderr)
 fn parse_snapshot_content(content: &str) -> Result<String, String> {
-    let content = content.to_string();
-
-    // Remove YAML front matter
-    let content = if content.starts_with("---") {
-        let parts: Vec<&str> = content.splitn(3, "---").collect();
-        if parts.len() >= 3 {
-            parts[2].trim().to_string()
-        } else {
-            content
-        }
-    } else {
-        content
-    };
-
-    // Handle insta_cmd format with stdout/stderr sections
-    let content = if content.contains("----- stdout -----") {
-        // Extract stdout section
-        let stdout = if let Some(start) = content.find("----- stdout -----\n") {
-            let after_header = &content[start + "----- stdout -----\n".len()..];
-            if let Some(end) = after_header.find("----- stderr -----") {
-                after_header[..end].trim_end().to_string()
-            } else {
-                after_header.trim_end().to_string()
-            }
-        } else {
-            String::new()
-        };
-
-        // Extract stderr section
-        let stderr = if let Some(start) = content.find("----- stderr -----\n") {
-            let after_header = &content[start + "----- stderr -----\n".len()..];
-            if let Some(end) = after_header.find("----- ") {
-                after_header[..end].trim_end().to_string()
-            } else {
-                after_header.trim_end().to_string()
-            }
-        } else {
-            String::new()
-        };
-
-        // Combine stdout and stderr by inserting gutter content after trigger lines
-        combine_stdout_stderr(&stdout, &stderr)
-    } else {
-        content
-    };
-
-    // Strip ANSI codes
-    Ok(strip_ansi(&content))
+    let snap = parse_snapshot_raw(content);
+    let combined = combine_stdout_stderr(&snap.stdout, &snap.stderr);
+    Ok(strip_ansi(&combined))
 }
 
 /// Trim trailing whitespace from each line and overall.
@@ -343,83 +470,53 @@ fn trim_lines(content: &str) -> String {
 
 /// Normalize snapshot output for README display (replace placeholders, trim whitespace)
 fn normalize_for_readme(content: &str) -> String {
-    // Real SHAs flow through from deterministic tests (fixed dates + git identity)
-    let content = HASH_REGEX.replace_all(content, "a1b2c3d");
-    // Replace branch worktree paths first (e.g., [TMPDIR]/repo.fix-auth -> ../repo.fix-auth)
-    let content = TMPDIR_BRANCH_REGEX.replace_all(&content, "../repo.$1");
-    // Replace main worktree paths (e.g., [TMPDIR]/repo -> ../repo), preserving trailing whitespace
-    let content = TMPDIR_MAIN_REGEX.replace_all(&content, "../repo$1");
-    let content = REPO_REGEX.replace_all(&content, "../repo");
-    trim_lines(&content)
+    trim_lines(&replace_placeholders(content))
 }
 
 /// Parse snapshot content for docs (with ANSI to HTML conversion)
+///
+/// Uses only stderr since that's where user-facing messages go.
 fn parse_snapshot_content_for_docs(content: &str) -> Result<String, String> {
-    let content = content.to_string();
+    let snap = parse_snapshot_raw(content);
 
-    // Remove YAML front matter
-    let content = if content.starts_with("---") {
-        let parts: Vec<&str> = content.splitn(3, "---").collect();
-        if parts.len() >= 3 {
-            parts[2].trim().to_string()
-        } else {
-            content
-        }
+    // For docs, we only use stderr (that's where user messages go)
+    let content = if snap.stderr.is_empty() {
+        snap.stdout
     } else {
-        content
-    };
-
-    // Handle insta_cmd format with stdout/stderr sections
-    let content = if content.contains("----- stdout -----") {
-        // For docs, we only use stderr (that's where user messages go)
-        if let Some(start) = content.find("----- stderr -----\n") {
-            let after_header = &content[start + "----- stderr -----\n".len()..];
-            if let Some(end) = after_header.find("----- ") {
-                after_header[..end].trim_end().to_string()
-            } else {
-                after_header.trim_end().to_string()
-            }
-        } else {
-            content
-        }
-    } else {
-        content
+        snap.stderr
     };
 
     // Replace placeholders before ANSI conversion
-    let content = HASH_REGEX.replace_all(&content, "a1b2c3d");
-    let content = TMPDIR_BRANCH_REGEX.replace_all(&content, "../repo.$1");
-    let content = TMPDIR_MAIN_REGEX.replace_all(&content, "../repo$1");
-    let content = REPO_REGEX.replace_all(&content, "../repo");
+    let content = replace_placeholders(&content);
 
     // Convert literal bracket notation [32m to escape sequences for the library
     let content = literal_to_escape(&content);
 
-    // Convert ANSI to HTML using the ansi-to-html library
+    // Convert ANSI to HTML
     let html = ansi_to_html(&content).map_err(|e| format!("ANSI conversion failed: {e}"))?;
 
-    // The ansi-to-html library leaves bare ESC characters (\x1b) in the output
-    // when processing our snapshot format. This happens because:
-    // 1. Snapshots use literal bracket notation like [32m (not real escape sequences)
-    // 2. We convert these to \x1b[32m before passing to ansi-to-html
-    // 3. The library wraps content in HTML tags but keeps bare \x1b chars
-    // Strip them all since they've already been converted to HTML styling.
+    // Clean up the HTML output
+    Ok(clean_ansi_html(&html))
+}
+
+/// Clean up HTML output from ansi-to-html conversion
+fn clean_ansi_html(html: &str) -> String {
+    // Regex to remove empty HTML spans (e.g., <span style='opacity:0.67'></span>)
+    static EMPTY_SPAN_REGEX: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"<span[^>]*></span>").unwrap());
+
+    // Strip bare ESC characters left by the library
     let html = html.replace('\x1b', "");
 
     // Clean up empty tags generated by reset codes
     let html = html.replace("<b></b>", "");
-    // Remove empty spans (e.g., <span style='opacity:0.67'></span>)
-    let empty_span_regex = Regex::new(r"<span[^>]*></span>").unwrap();
-    let html = empty_span_regex.replace_all(&html, "").to_string();
+    let html = EMPTY_SPAN_REGEX.replace_all(&html, "").to_string();
 
     // Replace verbose inline styles with CSS classes for cleaner output
-    let html = html
-        .replace("<span style='opacity:0.67'>", "<span class=d>")
+    html.replace("<span style='opacity:0.67'>", "<span class=d>")
         .replace("<span style='color:var(--green,#0a0)'>", "<span class=g>")
         .replace("<span style='color:var(--red,#a00)'>", "<span class=r>")
-        .replace("<span style='color:var(--cyan,#0aa)'>", "<span class=c>");
-
-    Ok(html)
+        .replace("<span style='color:var(--cyan,#0aa)'>", "<span class=c>")
 }
 
 /// Normalize snapshot output for docs display (just trim - placeholders already replaced)
@@ -531,71 +628,6 @@ fn increase_heading_levels(content: &str) -> String {
     result.join("\n")
 }
 
-/// Update a section in the README content, returning (new content, updated count, total count)
-/// The replacement function receives (id, current_content) to allow preserving existing values.
-fn update_readme_section(
-    content: &str,
-    pattern: &Regex,
-    get_replacement: impl Fn(&str, &str) -> Result<String, String>,
-    wrapper: (&str, &str),
-) -> Result<(String, usize, usize), Vec<String>> {
-    let mut result = content.to_string();
-    let mut errors = Vec::new();
-    let mut updated = 0;
-
-    // Collect all matches first (to avoid borrowing issues)
-    let matches: Vec<_> = pattern
-        .captures_iter(content)
-        .map(|cap| {
-            let full_match = cap.get(0).unwrap();
-            let id = cap.get(1).unwrap().as_str().to_string();
-            let current = trim_lines(cap.get(2).unwrap().as_str());
-            (full_match.start(), full_match.end(), id, current)
-        })
-        .collect();
-
-    let total = matches.len();
-
-    // Process in reverse order to preserve positions
-    for (start, end, id, current) in matches.into_iter().rev() {
-        let expected = match get_replacement(&id, &current) {
-            Ok(content) => content,
-            Err(e) => {
-                errors.push(format!("❌ {}: {}", id, e));
-                continue;
-            }
-        };
-
-        if current != expected {
-            // Build replacement with new AUTO-GENERATED format
-            // Include blank lines after opening marker and before closing marker
-            // to match markdown formatter expectations
-            let replacement = if wrapper.0.is_empty() {
-                // No wrapper (help sections - rendered markdown)
-                format!(
-                    "<!-- ⚠️ AUTO-GENERATED from `{}` — edit source to update -->\n\n{}\n\n<!-- END AUTO-GENERATED -->",
-                    id, expected
-                )
-            } else {
-                // With wrapper (snapshot sections)
-                // wrapper.0 includes trailing \n, so no extra newline between wrapper and content
-                format!(
-                    "<!-- ⚠️ AUTO-GENERATED from {} — edit source to update -->\n\n{}{}\n{}\n\n<!-- END AUTO-GENERATED -->",
-                    id, wrapper.0, expected, wrapper.1
-                )
-            };
-            result.replace_range(start..end, &replacement);
-            updated += 1;
-        }
-    }
-
-    if errors.is_empty() {
-        Ok((result, updated, total))
-    } else {
-        Err(errors)
-    }
-}
-
 /// Convert a template to commented TOML format
 fn comment_template(template: &str) -> String {
     template
@@ -695,11 +727,11 @@ fn sync_help_markers(file_path: &Path, project_root: &Path) -> Result<usize, Vec
         .map_err(|e| vec![format!("Failed to read {}: {}", file_path.display(), e)])?;
 
     let project_root_clone = project_root.to_path_buf();
-    match update_readme_section(
+    match update_section(
         &content,
         &HELP_MARKER_PATTERN,
+        OutputFormat::Help,
         |cmd, _current| get_help_output(cmd, &project_root_clone),
-        ("", ""),
     ) {
         Ok((new_content, updated_count, _total_count)) => {
             if updated_count > 0 {
@@ -725,9 +757,10 @@ fn test_readme_examples_are_in_sync() {
 
     // Update snapshot markers (with command line from YAML, or preserved from README)
     let project_root_for_snapshots = project_root.to_path_buf();
-    match update_readme_section(
+    match update_section(
         &updated_content,
         &SNAPSHOT_MARKER_PATTERN,
+        OutputFormat::Readme,
         |snap_path, current_content| {
             // Extract existing command line from README if present (e.g., "$ wt switch --create fix-auth")
             let existing_command = current_content
@@ -738,7 +771,6 @@ fn test_readme_examples_are_in_sync() {
             parse_snapshot_with_command(&full_path, existing_command)
                 .map(|content| normalize_for_readme(&content))
         },
-        ("```console\n", "```"),
     ) {
         Ok((new_content, updated_count, total_count)) => {
             updated_content = new_content;
@@ -750,11 +782,11 @@ fn test_readme_examples_are_in_sync() {
 
     // Update help markers (no wrapper - content is rendered markdown)
     let project_root_clone = project_root.to_path_buf();
-    match update_readme_section(
+    match update_section(
         &updated_content,
         &HELP_MARKER_PATTERN,
+        OutputFormat::Help,
         |cmd, _current| get_help_output(cmd, &project_root_clone),
-        ("", ""),
     ) {
         Ok((new_content, updated_count, total_count)) => {
             updated_content = new_content;
@@ -789,56 +821,6 @@ fn test_readme_examples_are_in_sync() {
              Run tests locally and commit the changes.",
             total_updated
         );
-    }
-}
-
-/// Update a docs section with HTML output (terminal shortcode wrapper)
-fn update_docs_section(
-    content: &str,
-    pattern: &Regex,
-    get_replacement: impl Fn(&str, &str) -> Result<String, String>,
-) -> Result<(String, usize, usize), Vec<String>> {
-    let mut result = content.to_string();
-    let mut errors = Vec::new();
-    let mut updated = 0;
-
-    // Collect all matches first
-    let matches: Vec<_> = pattern
-        .captures_iter(content)
-        .map(|cap| {
-            let full_match = cap.get(0).unwrap();
-            let id = cap.get(1).unwrap().as_str().to_string();
-            let current = trim_lines(cap.get(2).unwrap().as_str());
-            (full_match.start(), full_match.end(), id, current)
-        })
-        .collect();
-
-    let total = matches.len();
-
-    // Process in reverse order to preserve positions
-    for (start, end, id, current) in matches.into_iter().rev() {
-        let expected = match get_replacement(&id, &current) {
-            Ok(content) => content,
-            Err(e) => {
-                errors.push(format!("❌ {}: {}", id, e));
-                continue;
-            }
-        };
-
-        if current != expected {
-            let replacement = format!(
-                "<!-- ⚠️ AUTO-GENERATED-HTML from {} — edit source to update -->\n\n{{% terminal() %}}\n{}\n{{% end %}}\n\n<!-- END AUTO-GENERATED -->",
-                id, expected
-            );
-            result.replace_range(start..end, &replacement);
-            updated += 1;
-        }
-    }
-
-    if errors.is_empty() {
-        Ok((result, updated, total))
-    } else {
-        Err(errors)
     }
 }
 
@@ -879,9 +861,10 @@ fn sync_docs_snapshots(doc_path: &Path, project_root: &Path) -> Result<usize, Ve
         .map_err(|e| vec![format!("Failed to read {}: {}", doc_path.display(), e)])?;
 
     let project_root_for_snapshots = project_root.to_path_buf();
-    match update_docs_section(
+    match update_section(
         &content,
         &DOCS_SNAPSHOT_MARKER_PATTERN,
+        OutputFormat::DocsHtml,
         |snap_path, current_content| {
             // Extract existing command line from docs if present
             let existing_command = current_content
