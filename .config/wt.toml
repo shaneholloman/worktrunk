@@ -6,16 +6,20 @@
 #   {{ branch }}    - Branch name with slashes replaced by dashes
 #   {{ worktree }}  - Path to the new worktree
 #   {{ repo_root }} - Path to the main repository root
+# Post-start commands run in parallel after switching to a worktree
+[post-start]
 # Seed compiled dependencies from base worktree using CoW (copy-on-write)
 # Copies essential files (~7.5k), skipping 184k+ .rcgu.o incremental objects
 # Result: ~3 seconds instead of ~68 seconds
 # macOS: uses cp -c (clonefile on APFS)
-post-start = """
+deps = """
 [ -d {{ repo_root }}/target/debug/deps ] && [ ! -e {{ worktree }}/target ] &&
 mkdir -p {{ worktree }}/target/debug/deps &&
 cp -c {{ repo_root }}/target/debug/deps/*.rlib {{ repo_root }}/target/debug/deps/*.rmeta {{ worktree }}/target/debug/deps/ &&
 cp -cR {{ repo_root }}/target/debug/.fingerprint {{ repo_root }}/target/debug/build {{ worktree }}/target/debug/
 """
+# Fetch demo assets for docs development
+assets = "{{ repo_root }}/scripts/fetch-assets"
 
 # Post-merge hooks
 # These run in the main worktree after successful merge and push
