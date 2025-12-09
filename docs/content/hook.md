@@ -337,8 +337,9 @@ post-create = "python scripts/setup.py"
 import json
 import sys
 
-context = json.load(sys.stdin)
-print(f"Setting up {context['branch']} in {context['worktree']}")
+ctx = json.load(sys.stdin)
+print(f"Setting up {ctx['repo']} on branch {ctx['branch']}")
+print(f"Hook: {ctx['hook_type']} {ctx.get('hook_name', '(unnamed)')}")
 ```
 
 **Available fields:**
