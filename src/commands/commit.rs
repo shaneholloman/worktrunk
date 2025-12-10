@@ -80,6 +80,11 @@ impl<'a> CommitGenerator<'a> {
     ) -> anyhow::Result<()> {
         let repo = Repository::current();
 
+        // Fail early if nothing is staged (avoids confusing LLM prompt with empty diff)
+        if !repo.has_staged_changes()? {
+            anyhow::bail!("Nothing to commit");
+        }
+
         let stats_parts = repo.diff_stats_summary(&["diff", "--staged", "--shortstat"]);
 
         let changes_type = match stage_mode {
