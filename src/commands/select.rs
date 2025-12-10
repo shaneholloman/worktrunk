@@ -582,7 +582,7 @@ impl WorktreeSkimItem {
                 "log",
                 "--graph",
                 "--oneline",
-                "--format=%C(dim)%h %s%C(reset)",
+                "--format=%C(dim)%h%C(reset) %s",
                 "--color=always",
                 "-n",
                 LOG_LIMIT,
