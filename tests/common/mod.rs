@@ -298,6 +298,9 @@ impl TestRepo {
     /// Uses a fixture template for fast initialization - copies a pre-initialized
     /// git repo from `tests/fixtures/template-repo/` instead of running `git init`.
     /// This saves ~10ms per test by avoiding process spawns.
+    ///
+    /// Also sets up mock gh/glab commands that appear authenticated to prevent
+    /// CI status hints from appearing in test output.
     pub fn new() -> Self {
         let temp_dir = TempDir::new().unwrap();
 
@@ -311,7 +314,7 @@ impl TestRepo {
         let test_config_path = temp_dir.path().join("test-config.toml");
         let git_config_path = temp_dir.path().join("test-gitconfig");
 
-        Self {
+        let mut repo = Self {
             temp_dir,
             root,
             worktrees: HashMap::new(),
@@ -319,7 +322,12 @@ impl TestRepo {
             test_config_path,
             git_config_path,
             mock_bin_path: None,
-        }
+        };
+
+        // Mock gh/glab as authenticated to prevent CI hints in test output
+        repo.setup_mock_gh();
+
+        repo
     }
 
     /// Create an empty test repository (no commits, no branches).
@@ -435,23 +443,33 @@ impl TestRepo {
         cmd
     }
 
-    /// Clean environment for worktrunk CLI commands
+    /// Configure command for CLI tests with isolated environment.
     ///
-    /// Removes potentially interfering environment variables and sets
-    /// deterministic git environment for CLI tests.
-    ///
-    /// This also sets `WORKTRUNK_CONFIG_PATH` to an isolated test config
-    /// to prevent tests from polluting the user's real config file.
+    /// Sets `WORKTRUNK_CONFIG_PATH`, `HOME`, and mock gh/glab commands.
     pub fn clean_cli_env(&self, cmd: &mut Command) {
         configure_cli_command(cmd);
         self.configure_git_cmd(cmd);
-        // Set isolated config path to prevent polluting user's config
         cmd.env("WORKTRUNK_CONFIG_PATH", &self.test_config_path);
-        // Set consistent terminal width for stable snapshot output
-        // (can be overridden by individual tests that want to test specific widths)
-        // NOTE: We don't set PATH here. Tests inherit PATH from the test runner,
-        // which allows them to find git, shells, etc. Since we don't explicitly set it,
-        // insta-cmd won't capture it in snapshots, avoiding privacy leaks.
+        set_temp_home_env(cmd, self.home_path());
+        self.configure_mock_commands(cmd);
+    }
+
+    /// Get the isolated HOME directory for this test.
+    ///
+    /// This is the temp directory containing the repo and can be used to set up
+    /// user config files before running commands:
+    /// - `.zshrc`, `.bashrc` - shell integration config
+    /// - `.config/worktrunk/config.toml` - user config (note: overridden by WORKTRUNK_CONFIG_PATH)
+    ///
+    /// The directory structure is:
+    /// ```text
+    /// home_path()/
+    /// ├── repo/              # The git repository (root_path())
+    /// ├── test-config.toml   # WORKTRUNK_CONFIG_PATH target
+    /// └── test-gitconfig     # GIT_CONFIG_GLOBAL target
+    /// ```
+    pub fn home_path(&self) -> &Path {
+        self.temp_dir.path()
     }
 
     /// Prepare a `wt` command configured for shell completions within this repo.
@@ -825,7 +843,7 @@ impl TestRepo {
     /// This prevents CI detection from blocking tests with network calls.
     pub fn setup_mock_gh(&mut self) {
         let mock_bin = self.temp_dir.path().join("mock-bin");
-        std::fs::create_dir(&mock_bin).unwrap();
+        std::fs::create_dir_all(&mock_bin).unwrap();
 
         // Create mock gh script
         let gh_script = mock_bin.join("gh");

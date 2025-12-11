@@ -617,9 +617,6 @@ fn test_list_with_upstream_tracking() {
     let mut repo = TestRepo::new();
     repo.commit("Initial commit on main");
 
-    // Setup mock gh/glab to avoid network calls
-    repo.setup_mock_gh();
-
     // Set up remote - this already pushes main
     repo.setup_remote("main");
 
