@@ -418,6 +418,7 @@ fn tool_available(tool: &str, args: &[&str]) -> bool {
             cmd_str.push(' ');
             cmd_str.push_str(arg);
         }
+
         Command::new("cmd")
             .args(["/c", &cmd_str])
             .output()

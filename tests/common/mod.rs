@@ -1277,14 +1277,24 @@ esac
         #[cfg(windows)]
         {
             let gh_cmd = mock_bin.join("gh.cmd");
+            // Use goto-based structure for reliable exit codes on Windows.
+            // Single-line `if ... exit /b N` can have inconsistent behavior
+            // when scripts are invoked via `cmd /c`.
             std::fs::write(
                 &gh_cmd,
                 r#"@echo off
-if "%1"=="--version" (
-    echo gh version 2.0.0 (mock)
-    exit /b 0
-)
-if "%1"=="auth" exit /b 1
+if "%1"=="--version" goto version
+if "%1"=="auth" goto auth
+goto fail
+
+:version
+echo gh version 2.0.0 (mock)
+exit /b 0
+
+:auth
+exit /b 1
+
+:fail
 exit /b 1
 "#,
             )
@@ -1325,14 +1335,22 @@ esac
         #[cfg(windows)]
         {
             let glab_cmd = mock_bin.join("glab.cmd");
+            // Use goto-based structure for reliable exit codes on Windows.
             std::fs::write(
                 &glab_cmd,
                 r#"@echo off
-if "%1"=="--version" (
-    echo glab version 1.0.0 (mock)
-    exit /b 0
-)
-if "%1"=="auth" exit /b 1
+if "%1"=="--version" goto version
+if "%1"=="auth" goto auth
+goto fail
+
+:version
+echo glab version 1.0.0 (mock)
+exit /b 0
+
+:auth
+exit /b 1
+
+:fail
 exit /b 1
 "#,
             )
@@ -1368,7 +1386,7 @@ exit /b 1
             }
 
             paths.insert(0, mock_bin.clone());
-            let new_path = std::env::join_paths(paths).unwrap();
+            let new_path = std::env::join_paths(&paths).unwrap();
             cmd.env("PATH", new_path);
         }
     }
