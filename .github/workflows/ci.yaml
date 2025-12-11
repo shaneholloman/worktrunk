@@ -61,42 +61,30 @@ jobs:
         echo "Using Git Bash for Windows tests"
       shell: pwsh
 
-    - name: 🏭 Compile
-      uses: clechasseur/rs-cargo@v4
+    - name: Setup Python for pre-commit
+      uses: actions/setup-python@v5
       with:
-        command: test
-        args: --no-run --locked --features shell-integration-tests
+        python-version: '3.12'
 
-    - name: 📋 Test
-      uses: clechasseur/rs-cargo@v4
-      timeout-minutes: 10
-      with:
-        command: insta
-        args: test --test-runner=nextest --features shell-integration-tests
+    - name: 🔍 Pre-commit hooks
+      run: |
+        pip install pre-commit
+        pre-commit run --all-files
+      env:
+        # Skip lychee - the dedicated check-links job handles link checking
+        SKIP: lychee
 
-    - name: 📖 Doctest
-      uses: clechasseur/rs-cargo@v4
-      with:
-        command: test
-        args: --doc --locked
-
-    - name: 📎 Clippy
-      uses: clechasseur/rs-cargo@v4
-      with:
-        command: clippy
-        args: --all-targets --all-features -- -D warnings
-
-    - name: ⌨️ Fmt
-      uses: clechasseur/rs-cargo@v4
-      with:
-        command: fmt
-        args: --all --check
-
-    - name: 🗒️ Doc
-      uses: clechasseur/rs-cargo@v4
-      with:
-        command: doc
-        args: --no-deps
+    # TODO: Restore after next release (published wt doesn't have --force flag yet)
+    # # TODO: This installs from crates.io, not from the PR code. We should install from the
+    # # local checkout instead, but baptiste0928/cargo-install doesn't support local paths.
+    # # For now, pre-merge hooks run against the published version, not the PR changes.
+    # - name: Install wt
+    #   uses: baptiste0928/cargo-install@v3
+    #   with:
+    #     crate: worktrunk
+    #
+    # - name: 🧪 Pre-merge hooks
+    #   run: wt hook pre-merge --force
 
   check-links:
     runs-on: ubuntu-latest
