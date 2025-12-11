@@ -13,18 +13,19 @@ values) by reflecting those choices in the message text.
 "Created new worktree for feature at /path/to/worktree"
 ```
 
-**Avoid second-person ("you", "your"):** Messages should describe actions and
-state, not address the user directly.
+**Avoid "you/your" pronouns:** Messages should refer to things directly, not
+address the user. Imperatives like "Run", "Use", "Add" are fine — they're
+concise CLI idiom.
 
 ```rust
-// BAD - second-person
+// BAD - possessive pronoun
 "Use 'wt merge' to rebase your changes onto main"
-// GOOD - describes the action
+// GOOD - refers to the thing directly
 "Use 'wt merge' to rebase onto main"
 
-// BAD - second-person
+// BAD - possessive pronoun
 "Add one line to your shell config"
-// GOOD - refers to the thing
+// GOOD - refers to the thing directly
 "Add one line to the shell config"
 ```
 
