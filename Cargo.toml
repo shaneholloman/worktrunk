@@ -32,6 +32,8 @@ syntax-highlighting = ["dep:tree-sitter", "dep:tree-sitter-bash", "dep:tree-sitt
 # When enabled, run with NEXTEST_NO_INPUT_HANDLER=1 to avoid suspension.
 # See CLAUDE.md "Nextest Terminal Suspension" section for details.
 shell-integration-tests = []
+# Install git-wt binary so `git wt` works as a git subcommand
+git-wt = []
 
 [lib]
 name = "worktrunk"
@@ -40,6 +42,15 @@ path = "src/lib.rs"
 [[bin]]
 name = "wt"
 path = "src/main.rs"
+
+# Also install as git-wt so `git wt <command>` works as a git subcommand.
+# Primarily useful on Windows where `wt` conflicts with Windows Terminal.
+# See: https://github.com/max-sixty/worktrunk/issues/133
+# Install with: cargo install worktrunk --features git-wt
+[[bin]]
+name = "git-wt"
+path = "src/main.rs"
+required-features = ["git-wt"]
 
 
 [dependencies]
