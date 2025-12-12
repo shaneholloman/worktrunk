@@ -331,13 +331,20 @@ check = "echo 'USER_PRE_MERGE' > user_premerge_marker.txt"
     );
 }
 
+/// Test that hooks receive SIGINT when Ctrl-C is pressed.
+///
+/// Real Ctrl-C sends SIGINT to the entire foreground process group. We simulate this by:
+/// 1. Spawning wt in its own process group (so we don't kill the test runner)
+/// 2. Sending SIGINT to that process group (which includes wt and its hook children)
 #[rstest]
 #[cfg(unix)]
 fn test_pre_merge_hook_receives_sigint(repo: TestRepo) {
     use nix::sys::signal::{Signal, kill};
     use nix::unistd::Pid;
     use std::io::Read;
+    use std::os::unix::process::CommandExt;
     use std::process::Stdio;
+
     repo.commit("Initial commit");
 
     // Project pre-merge hook: write start, then sleep, then write done (if not interrupted)
@@ -348,30 +355,31 @@ long = "sh -c 'echo start >> hook.log; sleep 30; echo done >> hook.log'"
     );
     repo.commit("Add pre-merge hook");
 
-    // Spawn wt hook pre-merge (skip approval with --force)
-    // Redirect stdout/stderr to null to prevent output leaking into test runner
+    // Spawn wt in its own process group (so SIGINT to that group doesn't kill the test)
     let mut cmd = crate::common::wt_command();
     cmd.current_dir(repo.root_path());
     cmd.args(["hook", "pre-merge", "--force"]);
     cmd.stdout(Stdio::null());
     cmd.stderr(Stdio::null());
+    cmd.process_group(0); // wt becomes leader of its own process group
     let mut child = cmd.spawn().expect("failed to spawn wt hook pre-merge");
 
     // Wait until hook writes "start" to hook.log (verifies the hook is running)
-    // Use wait_for_file_content to ensure echo has finished writing, not just that the file exists
     let hook_log = repo.root_path().join("hook.log");
     wait_for_file_content(&hook_log, Duration::from_secs(5));
 
-    // Send SIGINT to wt (simulates Ctrl-C)
-    kill(Pid::from_raw(child.id() as i32), Signal::SIGINT).expect("failed to send SIGINT");
+    // Send SIGINT to wt's process group (wt's PID == its PGID since it's the leader)
+    // This simulates real Ctrl-C which sends SIGINT to the foreground process group
+    let wt_pgid = Pid::from_raw(child.id() as i32);
+    kill(Pid::from_raw(-wt_pgid.as_raw()), Signal::SIGINT).expect("failed to send SIGINT to pgrp");
 
     let status = child.wait().expect("failed to wait for wt");
 
-    // Expect conventional Ctrl-C exit code 130
-    assert_eq!(
-        status.code(),
-        Some(130),
-        "wt should exit with 130 on SIGINT, status: {status:?}"
+    // wt was killed by signal, so code() returns None and we check the signal
+    use std::os::unix::process::ExitStatusExt;
+    assert!(
+        status.signal() == Some(2) || status.code() == Some(130),
+        "wt should be killed by SIGINT (signal 2) or exit 130, got: {status:?}"
     );
 
     // Give the (killed) hook a moment; it must not append "done"

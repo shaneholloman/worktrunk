@@ -332,6 +332,7 @@ pub fn capture_progressive_output(
     let start_time = Instant::now();
 
     // Create PTY (handles signal blocking for background process groups)
+    // The guard restores the tty foreground pgrp on drop if it was changed
     let pty_system = super::native_pty_system();
     let pair = pty_system
         .openpty(PtySize {

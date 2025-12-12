@@ -72,6 +72,20 @@ When working in Claude Code web, run the setup script first:
 
 This installs required shells (zsh, fish) and builds the project. The permission tests (`test_permission_error_prevents_save`, `test_approval_prompt_permission_error`) automatically skip when running as root, which is common in containerized environments.
 
+### Shell/PTY Integration Tests
+
+PTY-based tests (approval prompts, TUI select, progressive rendering, shell wrappers) are behind the `shell-integration-tests` feature. These tests can trigger a nextest bug where its terminal cleanup receives SIGTTOU. See `native_pty_system()` in `tests/common/mod.rs` for details.
+
+```bash
+# Default: runs without PTY tests
+cargo nextest run
+
+# Full suite: requires env var to prevent nextest suspension
+NEXTEST_NO_INPUT_HANDLER=1 cargo nextest run --features shell-integration-tests
+```
+
+The pre-merge hook already sets `NEXTEST_NO_INPUT_HANDLER=1`.
+
 ### CLI Flag Descriptions
 
 Keep the first line of flag and argument descriptions brief—aim for 3-6 words. Use parenthetical defaults sparingly, only when the default isn't obvious from context.

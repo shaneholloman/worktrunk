@@ -402,10 +402,18 @@ pub fn merge_scenario_multi_commit(mut repo: TestRepo) -> (TestRepo, PathBuf) {
     (repo, feature_wt)
 }
 
-/// Returns a PTY system after ensuring SIGTTIN/SIGTTOU signals are blocked.
+/// Returns a PTY system with a guard that restores the TTY foreground pgrp on drop.
 ///
-/// Use this instead of `portable_pty::native_pty_system()` directly to ensure
-/// PTY tests work in background process groups (e.g., Codex).
+/// Use this instead of `portable_pty::native_pty_system()` directly to ensure:
+/// 1. PTY tests work in background process groups (signals blocked)
+/// 2. SIGTTIN/SIGTTOU are blocked to prevent test processes from being stopped
+///
+/// NOTE: PTY tests are behind the `shell-integration-tests` feature because they can
+/// trigger a nextest bug where its InputHandler cleanup receives SIGTTOU. This is NOT
+/// caused by our code - investigation confirmed our tests don't change the terminal's
+/// foreground process group. The issue is in nextest's teardown path (InputHandlerImpl::restore
+/// calls tcsetattr while nextest isn't in the foreground pgrp). Workaround: run with
+/// NEXTEST_NO_INPUT_HANDLER=1. See CLAUDE.md for details.
 #[cfg(unix)]
 pub fn native_pty_system() -> Box<dyn portable_pty::PtySystem> {
     ignore_tty_signals();

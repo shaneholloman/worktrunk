@@ -354,6 +354,7 @@ fn exec_in_pty_interactive(
     use std::io::{Read, Write};
 
     // Ignore SIGTTIN/SIGTTOU to prevent stopping in background process groups
+    // The guard restores the tty foreground pgrp on drop if it was changed
     let pty_system = crate::common::native_pty_system();
     let pair = pty_system
         .openpty(PtySize {

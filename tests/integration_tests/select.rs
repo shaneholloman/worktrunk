@@ -1,4 +1,4 @@
-#![cfg(unix)]
+#![cfg(all(unix, feature = "shell-integration-tests"))]
 //! TUI snapshot tests for `wt select`
 //!
 //! These tests use PTY execution combined with vt100 terminal emulation to capture

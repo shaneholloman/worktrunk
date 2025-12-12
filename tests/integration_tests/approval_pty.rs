@@ -1,4 +1,4 @@
-#![cfg(unix)]
+#![cfg(all(unix, feature = "shell-integration-tests"))]
 //! PTY-based tests for interactive approval prompts
 //!
 //! These tests verify the approval workflow in a real PTY environment where stdin is a TTY.
