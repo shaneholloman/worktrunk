@@ -156,10 +156,10 @@ impl Repository {
     /// 3. Otherwise, get the first remote with a configured URL
     /// 4. Fall back to "origin" if no remotes exist
     pub fn primary_remote(&self) -> anyhow::Result<String> {
-        // Try to get the remote from the current branch's upstream
-        if let Ok(Some(branch)) = self.current_branch()
-            && let Ok(Some(upstream)) = self.upstream_branch(&branch)
-            && let Some((remote, _)) = upstream.split_once('/')
+        // Try to get the remote from HEAD's upstream (single command)
+        // @{u} refers to the upstream of the current branch
+        if let Ok(upstream) = self.run_command(&["rev-parse", "--abbrev-ref", "@{u}"])
+            && let Some((remote, _)) = upstream.trim().split_once('/')
         {
             return Ok(remote.to_string());
         }
