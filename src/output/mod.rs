@@ -4,31 +4,21 @@
 //!
 //! Global context-based output system similar to logging frameworks (`log`, `tracing`).
 //! Initialize once at program start with `initialize(OutputMode)`, then use
-//! output functions anywhere: `success()`, `change_directory()`, `execute()`, etc.
+//! output functions anywhere: `print()`, `change_directory()`, `execute()`, etc.
 //!
 //! ## Design
 //!
-//! **Thread-local storage** stores the output handler globally:
+//! **Global state** with `OnceLock`:
 //!
 //! ```rust,ignore
-//! thread_local! {
-//!     static OUTPUT_CONTEXT: RefCell<OutputHandler> = ...;
-//! }
+//! static GLOBAL_MODE: OnceLock<OutputMode> = OnceLock::new();
+//! static OUTPUT_STATE: OnceLock<Mutex<OutputState>> = OnceLock::new();
 //! ```
 //!
-//! Each thread gets its own output context. `RefCell` provides interior mutability
-//! for mutation through shared references (runtime borrow checking).
+//! The mode is set once at initialization and readable by all threads.
+//! State (target_dir, exec_command) is stored globally for main thread operations.
 //!
-//! **Enum dispatch** routes calls to the appropriate handler:
-//!
-//! ```rust,ignore
-//! enum OutputHandler {
-//!     Interactive(InteractiveOutput),  // Human-friendly with colors
-//!     Directive(DirectiveOutput),      // Machine-readable for shell integration
-//! }
-//! ```
-//!
-//! This enables static dispatch and compiler optimizations.
+//! All output functions check the mode directly - no handler structs or traits.
 //!
 //! ## Usage Pattern
 //!
@@ -37,7 +27,7 @@
 //!
 //! // 1. Initialize once in main()
 //! let mode = if internal {
-//!     OutputMode::Directive
+//!     OutputMode::Directive(shell)
 //! } else {
 //!     OutputMode::Interactive
 //! };
@@ -53,15 +43,14 @@
 //! ## Output Modes
 //!
 //! - **Interactive**: Colors, emojis, shell hints, direct command execution
-//! - **Directive**: Shell script on stdout (at end), user messages on stderr (streaming)
+//!   - Messages to stderr, data (JSON) to stdout for piping
+//! - **Directive**: Shell script protocol for shell integration
+//!   - All messages to stderr, stdout reserved for shell script at end
 //!   - stdout: Shell script emitted at end (e.g., `cd '/path'`)
 //!   - stderr: Success messages, progress updates, warnings (streams in real-time)
 
-pub mod directive;
-pub mod global;
+mod global;
 pub mod handlers;
-pub mod interactive;
-mod traits;
 
 // Re-export the public API
 pub use global::{
