@@ -126,40 +126,10 @@ fn check_integration_against(
     branch_name: &str,
     target: &str,
 ) -> Option<IntegrationReason> {
-    // Check 1 (cheapest): Is branch HEAD literally the same commit as target?
-    // On error, continue to next check
-    if repo.same_commit(branch_name, target).unwrap_or(false) {
-        return Some(IntegrationReason::SameCommit);
-    }
-
-    // Check 2 (cheap): Is branch an ancestor of target (target has moved past)?
-    // On error, continue to next check
-    if repo.is_ancestor(branch_name, target).unwrap_or(false) {
-        return Some(IntegrationReason::Ancestor);
-    }
-
-    // Check 3: Does branch have no file changes beyond merge-base (empty three-dot diff)?
-    // On error, conservatively assume branch HAS changes (won't delete)
-    if !repo.has_added_changes(branch_name, target).unwrap_or(true) {
-        return Some(IntegrationReason::NoAddedChanges);
-    }
-
-    // Check 4: Does tree content match (handles squash merge/rebase)?
-    if repo.trees_match(branch_name, target).unwrap_or(false) {
-        return Some(IntegrationReason::TreesMatch);
-    }
-
-    // Check 5: Would merging this branch into target add anything?
-    // This handles squash-merged branches where target has since advanced.
-    // If merge would NOT add anything, the branch's content is already in target.
-    if !repo
-        .would_merge_add_to_target(branch_name, target)
-        .unwrap_or(true)
-    {
-        return Some(IntegrationReason::MergeAddsNothing);
-    }
-
-    None
+    // Use lazy provider for short-circuit evaluation.
+    // Expensive checks (would_merge_add) are skipped if cheaper ones succeed.
+    let mut provider = worktrunk::git::LazyGitIntegration::new(repo, branch_name, target);
+    worktrunk::git::check_integration(&mut provider)
 }
 
 /// Outcome of a branch deletion attempt.

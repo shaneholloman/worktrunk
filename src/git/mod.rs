@@ -160,6 +160,140 @@ impl IntegrationReason {
     }
 }
 
+/// Provider of integration signals for checking if a branch is integrated into target.
+///
+/// This trait enables short-circuit evaluation: methods are called in priority order,
+/// and expensive checks (like `would_merge_add`) are skipped if cheaper checks succeed.
+///
+/// Implementations:
+/// - [`LazyGitIntegration`]: Makes fresh git calls (for `wt remove`)
+/// - [`PrecomputedIntegration`]: Uses cached data (for `wt list` progressive rendering)
+pub trait IntegrationProvider {
+    fn is_same_commit(&mut self) -> bool;
+    fn is_ancestor(&mut self) -> bool;
+    fn has_added_changes(&mut self) -> bool;
+    fn trees_match(&mut self) -> bool;
+    fn would_merge_add(&mut self) -> bool;
+}
+
+/// Canonical integration check with short-circuit evaluation.
+///
+/// Checks signals in priority order (cheapest first). Returns as soon as any
+/// integration reason is found, avoiding expensive checks when possible.
+///
+/// This is the single source of truth for integration priority logic,
+/// used by both `wt list` and `wt remove`.
+pub fn check_integration(provider: &mut impl IntegrationProvider) -> Option<IntegrationReason> {
+    // Priority 1 (cheapest): Same commit as target
+    if provider.is_same_commit() {
+        return Some(IntegrationReason::SameCommit);
+    }
+
+    // Priority 2 (cheap): Branch is ancestor of target (target has moved past)
+    if provider.is_ancestor() {
+        return Some(IntegrationReason::Ancestor);
+    }
+
+    // Priority 3: No file changes beyond merge-base (empty three-dot diff)
+    if !provider.has_added_changes() {
+        return Some(IntegrationReason::NoAddedChanges);
+    }
+
+    // Priority 4: Tree SHA matches target (handles squash merge/rebase)
+    if provider.trees_match() {
+        return Some(IntegrationReason::TreesMatch);
+    }
+
+    // Priority 5 (most expensive ~500ms-2s): Merge would not add anything
+    if !provider.would_merge_add() {
+        return Some(IntegrationReason::MergeAddsNothing);
+    }
+
+    None
+}
+
+/// Lazy integration provider that makes fresh git calls.
+///
+/// Used by `wt remove` where short-circuit evaluation matters:
+/// expensive checks are skipped if cheaper ones succeed.
+pub struct LazyGitIntegration<'a> {
+    repo: &'a Repository,
+    branch: &'a str,
+    target: &'a str,
+}
+
+impl<'a> LazyGitIntegration<'a> {
+    pub fn new(repo: &'a Repository, branch: &'a str, target: &'a str) -> Self {
+        Self {
+            repo,
+            branch,
+            target,
+        }
+    }
+}
+
+impl IntegrationProvider for LazyGitIntegration<'_> {
+    fn is_same_commit(&mut self) -> bool {
+        self.repo
+            .same_commit(self.branch, self.target)
+            .unwrap_or(false)
+    }
+
+    fn is_ancestor(&mut self) -> bool {
+        self.repo
+            .is_ancestor(self.branch, self.target)
+            .unwrap_or(false)
+    }
+
+    fn has_added_changes(&mut self) -> bool {
+        self.repo
+            .has_added_changes(self.branch, self.target)
+            .unwrap_or(true) // Conservative: assume has changes
+    }
+
+    fn trees_match(&mut self) -> bool {
+        self.repo
+            .trees_match(self.branch, self.target)
+            .unwrap_or(false)
+    }
+
+    fn would_merge_add(&mut self) -> bool {
+        self.repo
+            .would_merge_add_to_target(self.branch, self.target)
+            .unwrap_or(true) // Conservative: assume would add
+    }
+}
+
+/// Pre-computed integration provider for cached data.
+///
+/// Used by `wt list` where signals are pre-computed during progressive rendering.
+/// Short-circuit doesn't help here since data is already computed.
+pub struct PrecomputedIntegration {
+    pub is_same_commit: bool,
+    pub is_ancestor: bool,
+    pub has_added_changes: bool,
+    pub trees_match: bool,
+    pub would_merge_add: bool,
+}
+
+impl IntegrationProvider for PrecomputedIntegration {
+    fn is_same_commit(&mut self) -> bool {
+        self.is_same_commit
+    }
+    fn is_ancestor(&mut self) -> bool {
+        self.is_ancestor
+    }
+    fn has_added_changes(&mut self) -> bool {
+        self.has_added_changes
+    }
+    fn trees_match(&mut self) -> bool {
+        self.trees_match
+    }
+    fn would_merge_add(&mut self) -> bool {
+        self.would_merge_add
+    }
+}
+
 /// Category of branch for completion display
 #[derive(Debug, Clone, PartialEq)]
 pub enum BranchCategory {
