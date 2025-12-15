@@ -88,3 +88,126 @@ pub fn expand_template(
     tmpl.render(minijinja::Value::from_object(context))
         .map_err(|e| format!("Template render error: {}", e))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_branch_name() {
+        let cases = [
+            ("feature/foo", "feature-foo"),
+            ("user\\task", "user-task"),
+            ("feature/user/task", "feature-user-task"),
+            ("feature/user\\task", "feature-user-task"),
+            ("simple-branch", "simple-branch"),
+            ("", ""),
+            ("///", "---"),
+            ("/feature", "-feature"),
+            ("feature/", "feature-"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(sanitize_branch_name(input), expected, "input: {input}");
+        }
+    }
+
+    #[test]
+    fn test_expand_template_basic() {
+        // Single variable
+        let mut vars = HashMap::new();
+        vars.insert("name", "world");
+        assert_eq!(
+            expand_template("Hello {{ name }}", &vars, false).unwrap(),
+            "Hello world"
+        );
+
+        // Multiple variables
+        vars.insert("repo", "myrepo");
+        assert_eq!(
+            expand_template("{{ repo }}/{{ name }}", &vars, false).unwrap(),
+            "myrepo/world"
+        );
+
+        // Empty/static cases
+        let empty: HashMap<&str, &str> = HashMap::new();
+        assert_eq!(expand_template("", &empty, false).unwrap(), "");
+        assert_eq!(
+            expand_template("static text", &empty, false).unwrap(),
+            "static text"
+        );
+        assert_eq!(
+            expand_template("no {{ variables }} here", &empty, false).unwrap(),
+            "no  here"
+        );
+    }
+
+    #[test]
+    fn test_expand_template_shell_escape() {
+        let mut vars = HashMap::new();
+        vars.insert("path", "my path");
+        let expanded = expand_template("cd {{ path }}", &vars, true).unwrap();
+        assert!(expanded.contains("'my path'") || expanded.contains("my\\ path"));
+
+        // Command injection prevention
+        vars.insert("arg", "test;rm -rf");
+        let expanded = expand_template("echo {{ arg }}", &vars, true).unwrap();
+        assert!(!expanded.contains(";rm") || expanded.contains("'"));
+
+        // No escape for literal mode
+        vars.insert("branch", "feature/foo");
+        assert_eq!(
+            expand_template("{{ branch }}", &vars, false).unwrap(),
+            "feature/foo"
+        );
+    }
+
+    #[test]
+    fn test_expand_template_errors() {
+        let vars = HashMap::new();
+        assert!(
+            expand_template("{{ unclosed", &vars, false)
+                .unwrap_err()
+                .contains("syntax error")
+        );
+        assert!(expand_template("{{ 1 + }}", &vars, false).is_err());
+    }
+
+    #[test]
+    fn test_expand_template_jinja_features() {
+        let mut vars = HashMap::new();
+        vars.insert("debug", "true");
+        assert_eq!(
+            expand_template("{% if debug %}DEBUG{% endif %}", &vars, false).unwrap(),
+            "DEBUG"
+        );
+
+        vars.insert("debug", "");
+        assert_eq!(
+            expand_template("{% if debug %}DEBUG{% endif %}", &vars, false).unwrap(),
+            ""
+        );
+
+        let empty: HashMap<&str, &str> = HashMap::new();
+        assert_eq!(
+            expand_template("{{ missing | default('fallback') }}", &empty, false).unwrap(),
+            "fallback"
+        );
+
+        vars.insert("name", "hello");
+        assert_eq!(
+            expand_template("{{ name | upper }}", &vars, false).unwrap(),
+            "HELLO"
+        );
+    }
+
+    #[test]
+    fn test_expand_template_trailing_newline() {
+        let mut vars = HashMap::new();
+        vars.insert("cmd", "echo hello");
+        assert!(
+            expand_template("{{ cmd }}\n", &vars, true)
+                .unwrap()
+                .ends_with('\n')
+        );
+    }
+}

@@ -596,4 +596,133 @@ mod tests {
             vec!["main".to_string(), "feature".to_string()]
         );
     }
+
+    #[test]
+    fn test_escape_unescape_roundtrip() {
+        // Test escape
+        let cases = [
+            ("main", "main"),
+            ("feature/foo", "feature-2Ffoo"),
+            ("feature_foo", "feature-5Ffoo"),
+            ("feature-foo", "feature-2Dfoo"),
+            ("v1.0.0", "v1.0.0"), // Dots allowed
+            ("user/feature_name-v2", "user-2Ffeature-5Fname-2Dv2"),
+        ];
+        for (input, expected_escaped) in cases {
+            assert_eq!(
+                escape_branch_for_config(input),
+                expected_escaped,
+                "escape {input}"
+            );
+            assert_eq!(
+                unescape_branch_from_config(expected_escaped),
+                input,
+                "unescape {expected_escaped}"
+            );
+        }
+        // Invalid/truncated escape sequences kept as-is
+        assert_eq!(unescape_branch_from_config("foo-GGbar"), "foo-GGbar");
+        assert_eq!(unescape_branch_from_config("foo-2"), "foo-2");
+    }
+
+    #[test]
+    fn test_check_integration() {
+        // Each integration reason + not integrated
+        let cases = [
+            (
+                (true, false, true, false, true),
+                Some(IntegrationReason::SameCommit),
+            ),
+            (
+                (false, true, true, false, true),
+                Some(IntegrationReason::Ancestor),
+            ),
+            (
+                (false, false, false, false, true),
+                Some(IntegrationReason::NoAddedChanges),
+            ),
+            (
+                (false, false, true, true, true),
+                Some(IntegrationReason::TreesMatch),
+            ),
+            (
+                (false, false, true, false, false),
+                Some(IntegrationReason::MergeAddsNothing),
+            ),
+            ((false, false, true, false, true), None), // Not integrated
+            (
+                (true, true, false, true, false),
+                Some(IntegrationReason::SameCommit),
+            ), // Priority test
+        ];
+        for ((same, ancestor, added, trees, merge), expected) in cases {
+            let mut provider = PrecomputedIntegration {
+                is_same_commit: same,
+                is_ancestor: ancestor,
+                has_added_changes: added,
+                trees_match: trees,
+                would_merge_add: merge,
+            };
+            assert_eq!(
+                check_integration(&mut provider),
+                expected,
+                "case: {same},{ancestor},{added},{trees},{merge}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_integration_reason_description() {
+        assert_eq!(
+            IntegrationReason::SameCommit.description(),
+            "same commit as"
+        );
+        assert_eq!(IntegrationReason::Ancestor.description(), "ancestor of");
+        assert_eq!(
+            IntegrationReason::NoAddedChanges.description(),
+            "no added changes"
+        );
+        assert_eq!(IntegrationReason::TreesMatch.description(), "tree matches");
+        assert_eq!(
+            IntegrationReason::MergeAddsNothing.description(),
+            "all changes in"
+        );
+    }
+
+    #[test]
+    fn test_path_dir_name() {
+        assert_eq!(
+            path_dir_name(&PathBuf::from("/home/user/repo.feature")),
+            "repo.feature"
+        );
+        assert_eq!(path_dir_name(&PathBuf::from("/")), "(unknown)");
+        assert!(!path_dir_name(&PathBuf::from("/home/user/repo/")).is_empty());
+
+        // Worktree::dir_name
+        let wt = Worktree {
+            path: PathBuf::from("/repos/myrepo.feature"),
+            head: "abc123".into(),
+            branch: Some("feature".into()),
+            bare: false,
+            detached: false,
+            locked: None,
+            prunable: None,
+        };
+        assert_eq!(wt.dir_name(), "myrepo.feature");
+    }
+
+    #[test]
+    fn test_hook_type_display() {
+        let cases = [
+            (HookType::PostCreate, "post-create"),
+            (HookType::PostStart, "post-start"),
+            (HookType::PreCommit, "pre-commit"),
+            (HookType::PreMerge, "pre-merge"),
+            (HookType::PostMerge, "post-merge"),
+            (HookType::PreRemove, "pre-remove"),
+        ];
+        for (hook, expected) in cases {
+            assert_eq!(format!("{hook}"), expected);
+        }
+    }
 }
