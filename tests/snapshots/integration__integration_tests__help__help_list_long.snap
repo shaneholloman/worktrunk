@@ -102,14 +102,15 @@ Output as JSON for scripting:
 
 The CI column shows GitHub/GitLab pipeline status:
 
-  Indicator  Meaning                  
-  ─────────  ─────────────────────────
-  [32m●[0m green    All checks passed        
-  [34m●[0m blue     Checks running           
-  [31m●[0m red      Checks failed            
-  [33m●[0m yellow   Merge conflicts with base
-  [90m●[0m gray     No checks configured     
-  (blank)    No upstream or no PR/MR  
+  Indicator  Meaning                          
+  ─────────  ─────────────────────────────────
+  [32m●[0m green    All checks passed                
+  [34m●[0m blue     Checks running                   
+  [31m●[0m red      Checks failed                    
+  [33m●[0m yellow   Merge conflicts with base        
+  [90m●[0m gray     No checks configured             
+  [33m⚠[0m yellow   Fetch error (rate limit, network)
+  (blank)    No upstream or no PR/MR          
 
 CI indicators are clickable links to the PR or pipeline page. Any CI dot appears dimmed when there are unpushed local changes (stale status). PRs/MRs
 are checked first, then branch workflows/pipelines for branches with an upstream. Local-only branches show blank. Results are cached for 30-60

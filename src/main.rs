@@ -346,6 +346,7 @@ fn colorize_ci_status_for_html(text: &str) -> String {
         .replace("`●` blue", "<span style='color:#00a'>●</span> blue")
         .replace("`●` red", "<span style='color:#a00'>●</span> red")
         .replace("`●` yellow", "<span style='color:#a60'>●</span> yellow")
+        .replace("`⚠` yellow", "<span style='color:#a60'>⚠</span> yellow")
         .replace("`●` gray", "<span style='color:#888'>●</span> gray")
 }
 

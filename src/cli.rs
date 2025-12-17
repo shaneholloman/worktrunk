@@ -1889,6 +1889,7 @@ The CI column shows GitHub/GitLab pipeline status:
 | `●` red | Checks failed |
 | `●` yellow | Merge conflicts with base |
 | `●` gray | No checks configured |
+| `⚠` yellow | Fetch error (rate limit, network) |
 | (blank) | No upstream or no PR/MR |
 
 CI indicators are clickable links to the PR or pipeline page. Any CI dot appears dimmed when there are unpushed local changes (stale status). PRs/MRs are checked first, then branch workflows/pipelines for branches with an upstream. Local-only branches show blank. Results are cached for 30-60 seconds; use `wt config state` to view or clear.
