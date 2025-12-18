@@ -15,6 +15,24 @@ use worktrunk::git::Repository;
 
 use super::list::{self, CollectOptions};
 
+#[derive(serde::Deserialize, Default)]
+struct ClaudeCodeContextJson {
+    #[serde(default)]
+    workspace: ClaudeCodeWorkspace,
+    #[serde(default)]
+    model: ClaudeCodeModel,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct ClaudeCodeWorkspace {
+    current_dir: Option<String>,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct ClaudeCodeModel {
+    display_name: Option<String>,
+}
+
 /// Claude Code context parsed from stdin JSON
 struct ClaudeCodeContext {
     /// Working directory from `.workspace.current_dir`
@@ -31,21 +49,12 @@ impl ClaudeCodeContext {
             return None;
         }
 
-        // Parse JSON
-        let json: serde_json::Value = serde_json::from_str(input).ok()?;
-
+        let json: ClaudeCodeContextJson = serde_json::from_str(input).ok()?;
         let current_dir = json
-            .get("workspace")
-            .and_then(|w| w.get("current_dir"))
-            .and_then(|d| d.as_str())
-            .unwrap_or(".")
-            .to_string();
-
-        let model_name = json
-            .get("model")
-            .and_then(|m| m.get("display_name"))
-            .and_then(|n| n.as_str())
-            .map(|s| s.to_string());
+            .workspace
+            .current_dir
+            .unwrap_or_else(|| ".".to_string());
+        let model_name = json.model.display_name;
 
         Some(Self {
             current_dir,

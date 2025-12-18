@@ -226,24 +226,23 @@ impl TaskError {
 /// without hardcoding result lists that could drift from the spawn functions.
 #[derive(Default)]
 pub(super) struct ExpectedResults {
-    inner: std::sync::Mutex<std::collections::HashMap<usize, Vec<TaskKind>>>,
+    inner: std::sync::Mutex<Vec<Vec<TaskKind>>>,
 }
 
 impl ExpectedResults {
     /// Record that we expect a result of the given kind for the given item.
     /// Called internally by `TaskSpawner::spawn()`.
     pub fn expect(&self, item_idx: usize, kind: TaskKind) {
-        self.inner
-            .lock()
-            .unwrap()
-            .entry(item_idx)
-            .or_default()
-            .push(kind);
+        let mut inner = self.inner.lock().unwrap();
+        if inner.len() <= item_idx {
+            inner.resize_with(item_idx + 1, Vec::new);
+        }
+        inner[item_idx].push(kind);
     }
 
     /// Total number of expected results (for progress display).
     pub fn count(&self) -> usize {
-        self.inner.lock().unwrap().values().map(|v| v.len()).sum()
+        self.inner.lock().unwrap().iter().map(|v| v.len()).sum()
     }
 
     /// Expected results for a specific item.
@@ -251,7 +250,7 @@ impl ExpectedResults {
         self.inner
             .lock()
             .unwrap()
-            .get(&item_idx)
+            .get(item_idx)
             .cloned()
             .unwrap_or_default()
     }
@@ -538,18 +537,22 @@ fn get_branches_without_worktrees(
     let all_branches = repo.list_local_branches()?;
 
     // Build a set of branch names that have worktrees
-    let worktree_branches: std::collections::HashSet<String> = worktrees
-        .iter()
-        .filter_map(|wt| wt.branch.clone())
-        .collect();
+    let worktree_branches = worktree_branch_set(worktrees);
 
     // Filter to branches without worktrees
     let branches_without_worktrees: Vec<_> = all_branches
         .into_iter()
-        .filter(|(branch_name, _)| !worktree_branches.contains(branch_name))
+        .filter(|(branch_name, _)| !worktree_branches.contains(branch_name.as_str()))
         .collect();
 
     Ok(branches_without_worktrees)
+}
+
+fn worktree_branch_set(worktrees: &[Worktree]) -> std::collections::HashSet<&str> {
+    worktrees
+        .iter()
+        .filter_map(|wt| wt.branch.as_deref())
+        .collect()
 }
 
 /// Get remote branches from all remotes that don't have local worktrees.
@@ -565,10 +568,7 @@ fn get_remote_branches(
     let all_remote_branches = repo.list_remote_branches()?;
 
     // Build a set of branch names that have worktrees
-    let worktree_branches: std::collections::HashSet<String> = worktrees
-        .iter()
-        .filter_map(|wt| wt.branch.clone())
-        .collect();
+    let worktree_branches = worktree_branch_set(worktrees);
 
     // Filter to remote branches whose local equivalent doesn't have a worktree
     let remote_branches: Vec<_> = all_remote_branches

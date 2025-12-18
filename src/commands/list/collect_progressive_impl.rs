@@ -10,7 +10,6 @@
 //!
 //! - `Task` trait: Each task type implements `compute()` returning a `TaskResult`
 //! - `TaskSpawner`: Ties together registration + spawn + send in a single operation
-//! - `define_task_suite!`: Generates spawn lists and expected sets from the same source
 //!
 //! This eliminates the "spawn but forget to register" failure mode from the old design.
 
@@ -143,6 +142,49 @@ impl TaskSpawner {
             }
             let _ = tx.send(result);
         });
+    }
+
+    fn spawn_core_tasks<'scope>(
+        &self,
+        scope: &'scope std::thread::Scope<'scope, '_>,
+        ctx: &TaskContext,
+    ) {
+        self.spawn::<CommitDetailsTask>(scope, ctx);
+        self.spawn::<AheadBehindTask>(scope, ctx);
+        self.spawn::<CommittedTreesMatchTask>(scope, ctx);
+        self.spawn::<HasFileChangesTask>(scope, ctx);
+        self.spawn::<IsAncestorTask>(scope, ctx);
+        self.spawn::<UpstreamTask>(scope, ctx);
+    }
+
+    fn spawn_worktree_only_tasks<'scope>(
+        &self,
+        scope: &'scope std::thread::Scope<'scope, '_>,
+        ctx: &TaskContext,
+    ) {
+        self.spawn::<WorkingTreeDiffTask>(scope, ctx);
+        self.spawn::<GitOperationTask>(scope, ctx);
+        self.spawn::<UserMarkerTask>(scope, ctx);
+    }
+
+    fn spawn_optional_tasks<'scope>(
+        &self,
+        scope: &'scope std::thread::Scope<'scope, '_>,
+        ctx: &TaskContext,
+        skip: &std::collections::HashSet<TaskKind>,
+    ) {
+        if !skip.contains(&TaskKind::BranchDiff) {
+            self.spawn::<BranchDiffTask>(scope, ctx);
+        }
+        if !skip.contains(&TaskKind::MergeTreeConflicts) {
+            self.spawn::<MergeTreeConflictsTask>(scope, ctx);
+        }
+        if !skip.contains(&TaskKind::CiStatus) {
+            self.spawn::<CiStatusTask>(scope, ctx);
+        }
+        if !skip.contains(&TaskKind::WouldMergeAdd) {
+            self.spawn::<WouldMergeAddTask>(scope, ctx);
+        }
     }
 }
 
@@ -518,8 +560,6 @@ pub fn collect_worktree_progressive(
     tx: Sender<Result<TaskResult, TaskError>>,
     expected_results: &Arc<ExpectedResults>,
 ) {
-    use super::collect::TaskKind;
-
     let ctx = TaskContext {
         repo_path: wt.path.clone(),
         commit_sha: wt.head.clone(),
@@ -534,29 +574,9 @@ pub fn collect_worktree_progressive(
 
     std::thread::scope(|s| {
         // Core tasks (always run)
-        spawner.spawn::<CommitDetailsTask>(s, &ctx);
-        spawner.spawn::<AheadBehindTask>(s, &ctx);
-        spawner.spawn::<CommittedTreesMatchTask>(s, &ctx);
-        spawner.spawn::<HasFileChangesTask>(s, &ctx);
-        spawner.spawn::<IsAncestorTask>(s, &ctx);
-        spawner.spawn::<WorkingTreeDiffTask>(s, &ctx);
-        spawner.spawn::<GitOperationTask>(s, &ctx);
-        spawner.spawn::<UserMarkerTask>(s, &ctx);
-        spawner.spawn::<UpstreamTask>(s, &ctx);
-
-        // Optional tasks (check skip set)
-        if !skip.contains(&TaskKind::BranchDiff) {
-            spawner.spawn::<BranchDiffTask>(s, &ctx);
-        }
-        if !skip.contains(&TaskKind::MergeTreeConflicts) {
-            spawner.spawn::<MergeTreeConflictsTask>(s, &ctx);
-        }
-        if !skip.contains(&TaskKind::CiStatus) {
-            spawner.spawn::<CiStatusTask>(s, &ctx);
-        }
-        if !skip.contains(&TaskKind::WouldMergeAdd) {
-            spawner.spawn::<WouldMergeAddTask>(s, &ctx);
-        }
+        spawner.spawn_core_tasks(s, &ctx);
+        spawner.spawn_worktree_only_tasks(s, &ctx);
+        spawner.spawn_optional_tasks(s, &ctx, skip);
     });
 }
 
@@ -580,8 +600,6 @@ pub fn collect_branch_progressive(
     tx: Sender<Result<TaskResult, TaskError>>,
     expected_results: &Arc<ExpectedResults>,
 ) {
-    use super::collect::TaskKind;
-
     let ctx = TaskContext {
         repo_path: repo_path.to_path_buf(),
         commit_sha: commit_sha.to_string(),
@@ -596,26 +614,8 @@ pub fn collect_branch_progressive(
 
     std::thread::scope(|s| {
         // Core tasks (always run)
-        spawner.spawn::<CommitDetailsTask>(s, &ctx);
-        spawner.spawn::<AheadBehindTask>(s, &ctx);
-        spawner.spawn::<CommittedTreesMatchTask>(s, &ctx);
-        spawner.spawn::<HasFileChangesTask>(s, &ctx);
-        spawner.spawn::<IsAncestorTask>(s, &ctx);
-        spawner.spawn::<UpstreamTask>(s, &ctx);
-
-        // Optional tasks (check skip set)
-        if !skip.contains(&TaskKind::BranchDiff) {
-            spawner.spawn::<BranchDiffTask>(s, &ctx);
-        }
-        if !skip.contains(&TaskKind::MergeTreeConflicts) {
-            spawner.spawn::<MergeTreeConflictsTask>(s, &ctx);
-        }
-        if !skip.contains(&TaskKind::CiStatus) {
-            spawner.spawn::<CiStatusTask>(s, &ctx);
-        }
-        if !skip.contains(&TaskKind::WouldMergeAdd) {
-            spawner.spawn::<WouldMergeAddTask>(s, &ctx);
-        }
+        spawner.spawn_core_tasks(s, &ctx);
+        spawner.spawn_optional_tasks(s, &ctx, skip);
     });
 }
 
