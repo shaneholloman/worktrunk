@@ -46,14 +46,14 @@ information, not restate what's already said.
 1. **Stats parentheses → Gray** (`[90m` bright-black): Supplementary numerical
    info that could be omitted without losing meaning.
    ```
-   ✅ Merged to main (1 commit, 1 file, +1)
-   🔄 Squashing 2 commits into a single commit (2 files, +2)...
+   ✓ Merged to main (1 commit, 1 file, +1)
+   ◎ Squashing 2 commits into a single commit (2 files, +2)...
    ```
 
 2. **Reason parentheses → Message color**: Explains WHY an action is happening;
    integral to understanding.
    ```
-   🔄 Removing feature worktree & branch in background (same commit as main, _)
+   ◎ Removing feature worktree & branch in background (same commit as main, _)
    ```
 
 Stats are truly optional context. Reasons answer "why is this safe/happening?"
