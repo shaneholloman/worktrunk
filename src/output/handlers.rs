@@ -676,20 +676,28 @@ fn handle_removed_worktree_output(
         let flag_text = &flag_note.text;
         let flag_after = flag_note.after_cyan();
 
+        // Directory change suffix: ". Changing directory to path" when we're moving the user
+        let dir_change = if changed_directory {
+            let path_display = format_path_for_display(main_path);
+            cformat!("<cyan>. Changing directory to <bold>{path_display}</></>")
+        } else {
+            String::new()
+        };
+
         // Reason in parentheses: user flags shown explicitly, integration reason for automatic cleanup
         // Note: We use FormattedMessage directly instead of progress_message() to control
         // where cyan styling ends. Symbol must be inside the <cyan> block to get proper coloring.
         let action = if deletion_mode.should_keep() {
             cformat!(
-                "<cyan>◎ Removing <bold>{branch_name}</> worktree in background; retaining branch{flag_text}</>{flag_after}"
+                "<cyan>◎ Removing <bold>{branch_name}</> worktree in background; retaining branch{flag_text}</>{flag_after}{dir_change}"
             )
         } else if should_delete_branch {
             cformat!(
-                "<cyan>◎ Removing <bold>{branch_name}</> worktree & branch in background{flag_text}</>{flag_after}"
+                "<cyan>◎ Removing <bold>{branch_name}</> worktree & branch in background{flag_text}</>{flag_after}{dir_change}"
             )
         } else {
             cformat!(
-                "<cyan>◎ Removing <bold>{branch_name}</> worktree in background; retaining unmerged branch</>"
+                "<cyan>◎ Removing <bold>{branch_name}</> worktree in background; retaining unmerged branch</>{dir_change}"
             )
         };
         super::print(FormattedMessage::new(action))?;
