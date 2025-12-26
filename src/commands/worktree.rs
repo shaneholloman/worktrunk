@@ -713,7 +713,7 @@ pub fn handle_switch(
             force,
         );
         // Approval was handled at the gate
-        ctx.execute_post_create_commands(true)?;
+        ctx.execute_post_create_commands()?;
     }
 
     // Note: post-start commands are spawned AFTER success message is shown
@@ -825,12 +825,8 @@ pub fn handle_remove_by_path(
 impl<'a> CommandContext<'a> {
     /// Execute post-create commands sequentially (blocking)
     ///
-    /// Runs user hooks first, then project hooks. Skips all hooks if verify is false.
-    pub fn execute_post_create_commands(&self, verify: bool) -> anyhow::Result<()> {
-        if !verify {
-            return Ok(());
-        }
-
+    /// Runs user hooks first, then project hooks.
+    pub fn execute_post_create_commands(&self) -> anyhow::Result<()> {
         let pipeline = HookPipeline::new(*self);
 
         // Run user hooks first (no approval required)
@@ -868,12 +864,8 @@ impl<'a> CommandContext<'a> {
 
     /// Spawn post-start commands in parallel as background processes (non-blocking)
     ///
-    /// Spawns user hooks first, then project hooks. Skips all hooks if verify is false.
-    pub fn spawn_post_start_commands(&self, verify: bool) -> anyhow::Result<()> {
-        if !verify {
-            return Ok(());
-        }
-
+    /// Spawns user hooks first, then project hooks.
+    pub fn spawn_post_start_commands(&self) -> anyhow::Result<()> {
         let pipeline = HookPipeline::new(*self);
 
         // Spawn user hooks first (no approval required)
@@ -908,13 +900,9 @@ impl<'a> CommandContext<'a> {
 
     /// Spawn post-switch commands in parallel as background processes (non-blocking)
     ///
-    /// Spawns user hooks first, then project hooks. Skips all hooks if verify is false.
+    /// Spawns user hooks first, then project hooks.
     /// Runs on every switch, including to existing worktrees and newly created ones.
-    pub fn spawn_post_switch_commands(&self, verify: bool) -> anyhow::Result<()> {
-        if !verify {
-            return Ok(());
-        }
-
+    pub fn spawn_post_switch_commands(&self) -> anyhow::Result<()> {
         let pipeline = HookPipeline::new(*self);
 
         // Spawn user hooks first (no approval required)

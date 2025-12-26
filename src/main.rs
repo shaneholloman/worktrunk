@@ -1309,11 +1309,11 @@ fn main() {
                     );
 
                     // Post-switch runs first (immediate "I'm here" signal)
-                    ctx.spawn_post_switch_commands(true)?;
+                    ctx.spawn_post_switch_commands()?;
 
                     // Post-start runs only on creation (setup tasks)
                     if matches!(&result, SwitchResult::Created { .. }) {
-                        ctx.spawn_post_start_commands(true)?;
+                        ctx.spawn_post_start_commands()?;
                     }
                 }
 
