@@ -372,7 +372,7 @@ fn apply_default(items: &mut [ListItem], status_contexts: &mut [StatusContext], 
 ///
 /// Callers decide how to handle timeout:
 /// - `collect()`: Shows user-facing diagnostic (interactive command)
-/// - `populate_items()`: Logs silently (used by statusline)
+/// - `populate_item()`: Logs silently (used by statusline)
 fn drain_results(
     rx: chan::Receiver<Result<TaskResult, TaskError>>,
     items: &mut [ListItem],
@@ -1225,7 +1225,7 @@ pub use super::collect_progressive_impl::CollectOptions;
 
 /// Build a ListItem for a single worktree with identity fields only.
 ///
-/// Computed fields (counts, diffs, CI) are left as None. Use `populate_items()`
+/// Computed fields (counts, diffs, CI) are left as None. Use `populate_item()`
 /// to fill them in.
 pub fn build_worktree_item(
     wt: &Worktree,
@@ -1269,75 +1269,59 @@ pub fn build_worktree_item(
 ///
 /// This is the blocking version used by statusline. For progressive rendering
 /// with callbacks, see the `collect()` function.
-pub fn populate_items(
-    items: &mut [ListItem],
+pub fn populate_item(
+    item: &mut ListItem,
     default_branch: &str,
     target: &str,
     options: CollectOptions,
 ) -> anyhow::Result<()> {
     use std::sync::Arc;
 
-    if items.is_empty() {
+    // Extract worktree data (skip if not a worktree item)
+    let Some(data) = item.worktree_data() else {
         return Ok(());
-    }
+    };
 
     // Create channel for task results
     let (tx, rx) = chan::unbounded::<Result<TaskResult, TaskError>>();
 
-    // Track expected results per item (populated at spawn time)
+    // Track expected results (populated at spawn time)
     let expected_results = Arc::new(ExpectedResults::default());
 
     // Collect errors (logged silently for statusline)
     let mut errors: Vec<TaskError> = Vec::new();
 
-    // Collect worktree info: (index, path, head, branch)
-    let worktree_info: Vec<_> = items
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, item)| {
-            item.worktree_data().map(|data| {
-                (
-                    idx,
-                    data.path.clone(),
-                    item.head.clone(),
-                    item.branch.clone(),
-                )
-            })
-        })
-        .collect();
-
-    // Spawn collection in background thread
+    // Extract data for background thread (can't send borrows across threads)
+    let wt = Worktree {
+        path: data.path.clone(),
+        head: item.head.clone(),
+        branch: item.branch.clone(),
+        bare: false,
+        detached: false,
+        locked: None,
+        prunable: None,
+    };
     let default_branch_clone = default_branch.to_string();
     let target_clone = target.to_string();
     let expected_results_clone = expected_results.clone();
+
+    // Spawn collection in background thread
     std::thread::spawn(move || {
-        for (idx, path, head, branch) in worktree_info {
-            // Create a minimal Worktree struct for the collection function
-            let wt = Worktree {
-                path,
-                head,
-                branch,
-                bare: false,
-                detached: false,
-                locked: None,
-                prunable: None,
-            };
-            super::collect_progressive_impl::collect_worktree_progressive(
-                &wt,
-                idx,
-                &default_branch_clone,
-                &target_clone,
-                &options,
-                tx.clone(),
-                &expected_results_clone,
-            );
-        }
+        super::collect_progressive_impl::collect_worktree_progressive(
+            &wt,
+            0, // Single item, always index 0
+            &default_branch_clone,
+            &target_clone,
+            &options,
+            tx,
+            &expected_results_clone,
+        );
     });
 
-    // Drain task results (blocking until all complete)
+    // Drain task results (blocking until complete)
     let drain_outcome = drain_results(
         rx,
-        items,
+        std::slice::from_mut(item),
         &mut errors,
         &expected_results,
         |_item_idx, item, ctx| {
@@ -1347,12 +1331,12 @@ pub fn populate_items(
 
     // Handle timeout (silent for statusline - just log it)
     if let DrainOutcome::TimedOut { received_count, .. } = drain_outcome {
-        log::warn!("populate_items timed out after 30s ({received_count} results received)");
+        log::warn!("populate_item timed out after 30s ({received_count} results received)");
     }
 
     // Log errors silently (statusline shouldn't spam warnings)
     if !errors.is_empty() {
-        log::warn!("populate_items had {} task errors", errors.len());
+        log::warn!("populate_item had {} task errors", errors.len());
         for error in &errors {
             let kind_str: &'static str = error.kind.into();
             log::debug!(
@@ -1365,9 +1349,7 @@ pub fn populate_items(
     }
 
     // Populate display fields (including status_line for statusline command)
-    for item in items.iter_mut() {
-        item.finalize_display();
-    }
+    item.finalize_display();
 
     Ok(())
 }

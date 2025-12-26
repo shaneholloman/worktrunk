@@ -243,21 +243,21 @@ fn get_git_status(repo: &Repository, cwd: &Path) -> Result<Option<String>> {
     let is_main = wt.path == main_worktree.path;
 
     // Build item with identity fields
-    let mut items = vec![list::build_worktree_item(wt, is_main, true, false)];
+    let mut item = list::build_worktree_item(wt, is_main, true, false);
 
     // Populate computed fields (parallel git operations) and format status_line
     // Compute everything (same as --full) for complete status symbols
     // Pass default_branch for stable informational stats,
     // and integration_target for integration status checks.
-    list::populate_items(
-        &mut items,
+    list::populate_item(
+        &mut item,
         &default_branch,
         &integration_target,
         CollectOptions::default(),
     )?;
 
     // Return the pre-formatted statusline
-    if let Some(ref statusline) = items[0].display.statusline {
+    if let Some(ref statusline) = item.display.statusline {
         Ok(Some(statusline.clone()))
     } else {
         // Fallback: just show branch name

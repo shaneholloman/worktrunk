@@ -137,7 +137,7 @@ use progressive::RenderMode;
 use worktrunk::git::Repository;
 
 // Re-export for statusline and other consumers
-pub use collect::{CollectOptions, build_worktree_item, populate_items};
+pub use collect::{CollectOptions, build_worktree_item, populate_item};
 
 pub fn handle_list(
     format: crate::OutputFormat,
