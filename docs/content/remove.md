@@ -77,7 +77,7 @@ Usage: <b><span class=c>wt remove</span></b> <span class=c>[OPTIONS]</span> <spa
 
 <b><span class=g>Arguments:</span></b>
   <span class=c>[WORKTREES]...</span>
-          Worktree or branch (@ for current)
+          Worktree or branch [default: current]
 
 <b><span class=g>Options:</span></b>
       <b><span class=c>--no-delete-branch</span></b>

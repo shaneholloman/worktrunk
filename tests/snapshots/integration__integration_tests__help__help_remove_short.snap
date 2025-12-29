@@ -9,6 +9,7 @@ info:
     CLICOLOR_FORCE: "1"
     COLUMNS: "150"
     GIT_EDITOR: ""
+    RUST_LOG: warn
     SOURCE_DATE_EPOCH: "1735776000"
     WORKTRUNK_CONFIG_PATH: /nonexistent/test/config.toml
 ---
@@ -22,7 +23,7 @@ wt remove - Remove worktree and branch
 Usage: [1m[36mwt remove[0m [36m[OPTIONS][0m [36m[WORKTREES]...
 
 [1m[32mArguments:
-  [36m[WORKTREES]...[0m  Worktree or branch (@ for current)
+  [36m[WORKTREES]...[0m  Worktree or branch [default: current]
 
 [1m[32mOptions:
       [1m[36m--no-delete-branch[0m  Keep branch after removal

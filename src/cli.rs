@@ -2309,7 +2309,7 @@ Removal runs in the background by default (returns immediately). Logs are writte
 "#
     )]
     Remove {
-        /// Worktree or branch (@ for current)
+        /// Worktree or branch [default: current]
         #[arg(add = crate::completion::local_branches_completer())]
         worktrees: Vec<String>,
 
