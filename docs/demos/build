@@ -32,6 +32,7 @@ TAPES_DIR = SCRIPT_DIR / "tapes"
 
 # Sizes
 SIZE_ZELLIJ = DemoSize(width=1200, height=700, fontsize=16)
+SIZE_DEVSERVER = DemoSize(width=1400, height=700, fontsize=24)  # Wider to show URL column
 
 # User's real Zellij plugins directory
 REAL_ZELLIJ_PLUGINS = Path.home() / ".config" / "zellij" / "plugins"
@@ -442,6 +443,41 @@ approved-commands = ["npm install", "npm run dev", "flyctl scale count 0"]
     path = env.work_base / f"acme.{branch}"
     git(["-C", str(env.repo), "worktree", "add", "-q", "-b", branch, str(path), "main"])
     git(["-C", str(path), "push", "-u", "origin", branch, "-q"])
+
+
+def prepare_twitter_devserver(env: DemoEnv):
+    """Setup for wt-devserver demo - shows URL column in wt list."""
+    hooks_config = '''[post-start]
+dev = "npm run dev -- --port {{ branch | hash_port }} &"
+
+[list]
+url = "http://localhost:{{ branch | hash_port }}"
+'''
+    prepare_demo_repo(env, REPO_ROOT, hooks_config=hooks_config)
+
+    bin_dir = env.home / "bin"
+
+    # npm mock that starts nc listener so URL appears active
+    npm_mock = bin_dir / "npm"
+    npm_mock.write_text("""#!/bin/bash
+if [[ "$1" == "run" && "$2" == "dev" ]]; then
+    PORT="$5"
+    echo ""
+    echo "  VITE v5.4.2  ready in 342 ms"
+    echo ""
+    echo "  ➜  Local:   http://localhost:$PORT/"
+    # Start nc listener so wt list shows URL as active (not dimmed)
+    nc -l "$PORT" >/dev/null 2>&1 &
+fi
+""")
+    npm_mock.chmod(0o755)
+
+    # User config with approved command
+    config_dir = env.home / ".config" / "worktrunk"
+    project_id = str(env.bare_remote).removesuffix(".git")
+    (config_dir / "config.toml").write_text(f'''[projects."{project_id}"]
+approved-commands = ["npm run dev -- --port {{{{ branch | hash_port }}}} &"]
+''')
 
 
 def prepare_twitter_zellij(env: DemoEnv):
@@ -944,6 +980,7 @@ TWITTER_DEMOS = [
     ("wt-list.tape", "wt-list", prepare_twitter_core, "vhs", None),
     ("wt-list-remove.tape", "wt-list-remove", prepare_twitter_core, "vhs", None),
     ("wt-hooks.tape", "wt-hooks", prepare_twitter_hooks, "vhs", None),
+    ("wt-devserver.tape", "wt-devserver", prepare_twitter_devserver, "vhs", SIZE_DEVSERVER),
     ("wt-commit.tape", "wt-commit", prepare_twitter_commit, "vhs", None),
     ("wt-merge.tape", "wt-merge", prepare_twitter_merge, "vhs", None),
     ("wt-select-short.tape", "wt-select-short", prepare_twitter_select, "vhs-keystrokes", None),

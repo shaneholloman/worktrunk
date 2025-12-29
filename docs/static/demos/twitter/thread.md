@@ -9,16 +9,17 @@ STRUCTURE:
 5. Core command - wt switch
 6. Other core commands - list, remove
 7-12. Features - hooks, list + CI status, select, LLM commits, wt merge, status line
-13. CTA - install, docs, feedback, star
-14. Thanks to Claude Code team + RT request
+13. Omnibus demo - full workflow with parallel agents in Zellij
+14. CTA - install, docs, feedback, star
+15. Thanks to Claude Code team + RT request
 
 DESIGN DECISIONS:
 - Lead with "models improved → running more agents → worktrees → UX terrible → built this"
 - 🧵 signals it's a thread
 - Tweet 1 is link-free (hook needs max reach)
-- GitHub link in tweet 4 (what Worktrunk is); GitHub star in tweet 13 (CTA)
+- GitHub link in tweet 4 (what Worktrunk is); GitHub star in tweet 14 (CTA)
 - Tweet 2 explains isolation need; tweet 3 shows UX pain; tweet 4 introduces Worktrunk; tweet 5 shows wt switch
-- Tweet 14 thanks team + RT request
+- Tweet 15 thanks team + RT request
 - Core commands split across two tweets for focused demos
 - Features are snappy, one per tweet, with media where applicable
 - Monospace: Twitter doesn't support it; use screenshots or plain text (GIF shows commands)
@@ -44,8 +45,8 @@ A few points on why I'm so excited about the project, and why I hope it becomes 
 
 [wt-demo.gif]
 
-<!-- TODO: Consider a Zellij demo showing 4-5 tabs, each named by branch (via zellij-tab-name plugin),
-     each with Claude Code in left pane + diff in right pane. Would powerfully show parallel agents. -->
+<!-- NOTE: Considered Zellij demo here but it's too complex for tweet 1's hook role.
+     Placed omnibus demo at tweet 13 instead (before CTA). -->
 
 <!-- ============ PHASE 2: CONTEXT ============ -->
 <!-- Goal: Why isolation matters, then prove the UX problem -->
@@ -129,10 +130,15 @@ wt merge: squash, rebase, merge, remove worktree, delete branch, in one command.
 
 [screenshot of Claude Code with worktrunk statusline]
 
+**13/** (106 chars)
+Putting it all together: parallel Claude Code agents in Zellij tabs, creating features, merging them back.
+
+[wt-zellij-omnibus.gif]
+
 <!-- ============ PHASE 5: CTA ============ -->
 <!-- Goal: Install instructions, docs, invite feedback, star -->
 
-**13/** (167 chars)
+**14/** (167 chars)
 To install:
 
 brew install max-sixty/worktrunk/wt
@@ -142,10 +148,10 @@ Feedback welcome. Open an issue or reply here.
 
 ⭐ https://github.com/max-sixty/worktrunk
 
-**14/** (230 chars)
+**15/** (230 chars)
 Big thanks to @AnthropicAI and the @claudeai team, including @bcherny @\_catwu @alexalbert\_\_, for building Claude Code. Worktrunk wouldn't exist without it 🙏
 
-If this was useful, the first tweet helps spread the word.
+If this was useful, liking & RT-ing the first tweet helps spread the word.
 
 [TODO: paste link to tweet 1]
 
