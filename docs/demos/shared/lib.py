@@ -266,7 +266,7 @@ def setup_claude_code_config(
         "lastReleaseNotesSeen": "99.0.0",
         "lastOnboardingVersion": "99.0.0",
         "oauthAccount": {
-            "displayName": "Demo User",
+            "displayName": "wt",
             "emailAddress": "demo@example.com"
         },
         "customApiKeyResponses": {
