@@ -854,7 +854,7 @@ mod tests {
     fn test_wrapper_switch_with_execute(#[case] shell: &str, repo: TestRepo) {
         skip_if_shell_unavailable!(shell);
 
-        // Use --force to skip approval prompt in tests
+        // Use --yes to skip approval prompt in tests
         let output = exec_through_wrapper(
             shell,
             &repo,
@@ -894,7 +894,7 @@ mod tests {
     fn test_wrapper_execute_exit_code_propagation(#[case] shell: &str, repo: TestRepo) {
         skip_if_shell_unavailable!(shell);
 
-        // Use --force to skip approval prompt in tests
+        // Use --yes to skip approval prompt in tests
         // wt should succeed (creates worktree), but the execute command should fail with exit 42
         let output = exec_through_wrapper(
             shell,
@@ -1223,7 +1223,7 @@ approved-commands = ["echo 'test command executed'"]
 
     #[rstest]
     fn test_switch_with_execute_through_wrapper(repo: TestRepo) {
-        // Use --force to skip approval prompt in tests
+        // Use --yes to skip approval prompt in tests
         let output = exec_through_wrapper(
             "bash",
             &repo,
@@ -1447,7 +1447,7 @@ approved-commands = ["echo 'fish background task'"]
         // Use actual newlines in the command string
         let multiline_cmd = "echo 'line 1'; echo 'line 2'; echo 'line 3'";
 
-        // Use --force to skip approval prompt in tests
+        // Use --yes to skip approval prompt in tests
         let output = exec_through_wrapper(
             "fish",
             &repo,

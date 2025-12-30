@@ -6,7 +6,7 @@ use rstest::rstest;
 use std::fs;
 use tempfile::TempDir;
 
-/// Test `wt config shell install` with --force flag (skips confirmation)
+/// Test `wt config shell install` with --yes flag (skips confirmation)
 #[rstest]
 fn test_configure_shell_with_yes(repo: TestRepo, temp_home: TempDir) {
     // Create a fake .zshrc file

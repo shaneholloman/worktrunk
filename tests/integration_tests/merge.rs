@@ -599,7 +599,7 @@ fn test_merge_pre_merge_command_success(mut repo: TestRepo) {
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force to skip approval prompts
+    // Merge with --yes to skip approval prompts
     snapshot_merge(
         "merge_pre_merge_command_success",
         &repo,
@@ -621,7 +621,7 @@ fn test_merge_pre_merge_command_failure(mut repo: TestRepo) {
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force - pre-merge command should fail and block merge
+    // Merge with --yes - pre-merge command should fail and block merge
     snapshot_merge(
         "merge_pre_merge_command_failure",
         &repo,
@@ -674,7 +674,7 @@ test = "exit 0"
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force - all pre-merge commands should pass
+    // Merge with --yes - all pre-merge commands should pass
     snapshot_merge(
         "merge_pre_merge_command_named",
         &repo,
@@ -700,7 +700,7 @@ fn test_merge_post_merge_command_success(mut repo: TestRepo) {
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force
+    // Merge with --yes
     snapshot_merge(
         "merge_post_merge_command_success",
         &repo,
@@ -768,7 +768,7 @@ fn test_merge_post_merge_command_failure(mut repo: TestRepo) {
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force - post-merge command should fail but merge should complete
+    // Merge with --yes - post-merge command should fail but merge should complete
     snapshot_merge(
         "merge_post_merge_command_failure",
         &repo,
@@ -798,7 +798,7 @@ deploy = "echo 'Deploying branch {{ branch }}' > deploy.txt"
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force
+    // Merge with --yes
     snapshot_merge(
         "merge_post_merge_command_named",
         &repo,
@@ -840,7 +840,7 @@ fn test_merge_post_merge_runs_with_nothing_to_merge(mut repo: TestRepo) {
     // Create a feature worktree with NO commits (already up-to-date with main)
     let feature_wt = repo.add_worktree("feature");
 
-    // Merge with --force - nothing to merge but post-merge should still run
+    // Merge with --yes - nothing to merge but post-merge should still run
     snapshot_merge(
         "merge_post_merge_runs_with_nothing_to_merge",
         &repo,
@@ -907,7 +907,7 @@ fn test_merge_pre_commit_command_success(mut repo: TestRepo) {
     let feature_wt = repo.add_worktree("feature");
     fs::write(feature_wt.join("feature.txt"), "feature content").unwrap();
 
-    // Merge with --force (changes uncommitted, should trigger pre-commit hook)
+    // Merge with --yes (changes uncommitted, should trigger pre-commit hook)
     snapshot_merge(
         "merge_pre_commit_command_success",
         &repo,
@@ -932,7 +932,7 @@ fn test_merge_pre_commit_command_failure(mut repo: TestRepo) {
     let feature_wt = repo.add_worktree("feature");
     fs::write(feature_wt.join("feature.txt"), "feature content").unwrap();
 
-    // Merge with --force - pre-commit command should fail and block merge
+    // Merge with --yes - pre-commit command should fail and block merge
     snapshot_merge(
         "merge_pre_commit_command_failure",
         &repo,
@@ -960,7 +960,7 @@ fn test_merge_pre_squash_command_success(mut repo: TestRepo) {
     // Create a feature worktree and make commits
     let feature_wt = repo.add_feature();
 
-    // Merge with --force (squashing is now the default)
+    // Merge with --yes (squashing is now the default)
     snapshot_merge(
         "merge_pre_squash_command_success",
         &repo,
@@ -982,7 +982,7 @@ fn test_merge_pre_squash_command_failure(mut repo: TestRepo) {
     repo.add_main_worktree();
     let feature_wt = repo.add_feature();
 
-    // Merge with --force (squashing is default) - pre-commit command should fail and block merge
+    // Merge with --yes (squashing is default) - pre-commit command should fail and block merge
     snapshot_merge(
         "merge_pre_squash_command_failure",
         &repo,
@@ -1266,7 +1266,7 @@ command = "{}"
     );
     fs::write(repo.test_config_path(), worktrunk_config).unwrap();
 
-    // Merge with --force to skip approval prompts for commands
+    // Merge with --yes to skip approval prompts for commands
     // This test explicitly sets PATH (which will be captured in snapshot) because it needs
     // to find mock commands in .bin directory. We use a clean, minimal PATH to avoid leaking
     // user-specific paths like ~/.cargo/bin into the snapshot.
@@ -1359,7 +1359,7 @@ fi
         .output()
         .unwrap();
 
-    // Set PATH to include mock commands and run switch --create with --force
+    // Set PATH to include mock commands and run switch --create with --yes
     let path_with_bin = format!(
         "{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         bin_dir.display()
@@ -1613,7 +1613,7 @@ command = "{}"
     );
     fs::write(repo.test_config_path(), worktrunk_config).unwrap();
 
-    // Set PATH and merge with --force
+    // Set PATH and merge with --yes
     let path_with_bin = format!(
         "{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         bin_dir.display()

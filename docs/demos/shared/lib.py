@@ -421,7 +421,7 @@ end
     wt_bin = repo_root / "target" / "debug" / "wt"
     install_env = os.environ.copy()
     install_env["HOME"] = str(env.home)
-    run([str(wt_bin), "config", "shell", "install", "fish", "--force"], env=install_env)
+    run([str(wt_bin), "config", "shell", "install", "fish", "--yes"], env=install_env)
 
 
 def setup_mock_clis(env: DemoEnv) -> None:

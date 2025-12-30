@@ -209,13 +209,13 @@ fn test_isolated_config_safety() {
     assert!(isolated_content.contains("THIS SHOULD NOT APPEAR IN USER CONFIG"));
 }
 
-/// Test that --force flag does NOT save approvals
+/// Test that --yes flag does NOT save approvals
 ///
-/// The --force flag should allow commands to run once without saving them
-/// to the config file. This ensures --force is a one-time bypass, not a
+/// The --yes flag should allow commands to run once without saving them
+/// to the config file. This ensures --yes is a one-time bypass, not a
 /// permanent approval.
 #[test]
-fn test_force_flag_does_not_save_approval() {
+fn test_yes_flag_does_not_save_approval() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("config.toml");
 
@@ -223,8 +223,8 @@ fn test_force_flag_does_not_save_approval() {
     let initial_config = WorktrunkConfig::default();
     initial_config.save_to(&config_path).unwrap();
 
-    // When using --force, the approval is NOT saved to config
-    // This is the correct behavior - force is a one-time bypass
+    // When using --yes, the approval is NOT saved to config
+    // This is the correct behavior - yes is a one-time bypass
     // So we just verify the initial config is unchanged
 
     // Load the config and verify it's still empty (no approvals added)
@@ -239,7 +239,7 @@ fn test_force_flag_does_not_save_approval() {
 
 /// Test that approval saving logic handles missing config gracefully
 #[test]
-fn test_force_flag_saves_to_new_config_file() {
+fn test_approval_saves_to_new_config_file() {
     let temp_dir = TempDir::new().unwrap();
     let config_dir = temp_dir.path().join("nested").join("config");
     let config_path = config_dir.join("config.toml");

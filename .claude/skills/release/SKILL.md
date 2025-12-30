@@ -7,7 +7,7 @@ description: Worktrunk release workflow. Use when user asks to "do a release", "
 
 ## Steps
 
-1. **Run tests**: `cargo run -- hook pre-merge --force`
+1. **Run tests**: `cargo run -- hook pre-merge --yes`
 2. **Check current version**: Read `version` in `Cargo.toml`
 3. **Review commits**: Check commits since last release to understand scope of changes
 4. **Credit contributors**: Check for external contributors with `git log v<last-version>..HEAD --format="%an <%ae>" | sort -u` and credit them in changelog entries (see below)

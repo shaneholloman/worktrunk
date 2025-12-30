@@ -57,7 +57,7 @@ Avoid mixing: "main/default branch worktree" is confusing. Use "main worktree" f
 
 ```bash
 # Run all tests + lints (recommended before committing)
-cargo run -- hook pre-merge --force
+cargo run -- hook pre-merge --yes
 ```
 
 The pre-merge hook runs lints and the full test suite.
@@ -108,7 +108,7 @@ PTY-based tests (approval prompts, TUI select, progressive rendering, shell wrap
    NEXTEST_NO_INPUT_HANDLER=1 cargo nextest run --features shell-integration-tests
    ```
 
-The pre-merge hook (`wt hook pre-merge --force`) already sets `NEXTEST_NO_INPUT_HANDLER=1` automatically. See `tests/common/mod.rs` for technical details on the SIGTTOU issue.
+The pre-merge hook (`wt hook pre-merge --yes`) already sets `NEXTEST_NO_INPUT_HANDLER=1` automatically. See `tests/common/mod.rs` for technical details on the SIGTTOU issue.
 
 ## Command Execution Principles
 

@@ -353,7 +353,7 @@ fn test_switch_no_config_commands_with_existing_worktree(mut repo: TestRepo) {
 }
 
 #[rstest]
-fn test_switch_no_config_commands_with_force(repo: TestRepo) {
+fn test_switch_no_config_commands_with_yes(repo: TestRepo) {
     use std::fs;
 
     // Create project config with a command
@@ -367,12 +367,12 @@ fn test_switch_no_config_commands_with_force(repo: TestRepo) {
 
     repo.commit("Add config");
 
-    // With --no-verify, even --force shouldn't execute config commands
+    // With --no-verify, even --yes shouldn't execute config commands
     // (HOME is automatically set to repo.home_path() by clean_cli_env)
     snapshot_switch(
-        "switch_no_hooks_with_force",
+        "switch_no_hooks_with_yes",
         &repo,
-        &["--create", "force-no-hooks", "--yes", "--no-verify"],
+        &["--create", "yes-no-hooks", "--yes", "--no-verify"],
     );
 }
 // Branch inference and special branch tests

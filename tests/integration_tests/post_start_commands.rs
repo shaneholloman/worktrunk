@@ -224,7 +224,7 @@ approved-commands = ["echo 'Default: {{ default_branch }}' > default.txt"]
 "#,
     );
 
-    // Create a feature branch worktree (--force skips approval prompt)
+    // Create a feature branch worktree (--yes skips approval prompt)
     snapshot_switch(
         "post_create_default_branch_template",
         &repo,
@@ -267,7 +267,7 @@ worktree_name = "echo 'Worktree Name: {{ worktree_name }}' >> git_vars.txt"
 
     repo.commit("Add config with git template variables");
 
-    // Create a feature branch worktree (--force skips approval prompt)
+    // Create a feature branch worktree (--yes skips approval prompt)
     snapshot_switch(
         "post_create_git_variables_template",
         &repo,

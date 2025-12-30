@@ -106,33 +106,32 @@ approved-commands = ["echo 'Second command'"]
 }
 
 #[rstest]
-fn test_force_flag_does_not_save_approvals(repo: TestRepo) {
+fn test_yes_flag_does_not_save_approvals(repo: TestRepo) {
     repo.write_project_config(r#"post-create = "echo 'test command' > output.txt""#);
 
     repo.commit("Add config");
 
-    // Run with --force
+    // Run with --yes
     let settings = setup_snapshot_settings(&repo);
     settings.bind(|| {
-        let mut cmd =
-            make_snapshot_cmd(&repo, "switch", &["--create", "test-force", "--yes"], None);
-        assert_cmd_snapshot!("force_does_not_save_approvals_first_run", cmd);
+        let mut cmd = make_snapshot_cmd(&repo, "switch", &["--create", "test-yes", "--yes"], None);
+        assert_cmd_snapshot!("yes_does_not_save_approvals_first_run", cmd);
     });
 
     // Clean up the worktree
     let mut cmd = Command::new(insta_cmd::get_cargo_bin("wt"));
     repo.clean_cli_env(&mut cmd);
     cmd.arg("remove")
-        .arg("test-force")
+        .arg("test-yes")
         .arg("--yes")
         .current_dir(repo.root_path());
     cmd.output().unwrap();
 
-    // Run again WITHOUT --force - should prompt
+    // Run again WITHOUT --yes - should prompt
     snapshot_approval(
-        "force_does_not_save_approvals_second_run",
+        "yes_does_not_save_approvals_second_run",
         &repo,
-        &["--create", "test-force-2"],
+        &["--create", "test-yes-2"],
         false,
     );
 }
@@ -288,7 +287,7 @@ fn test_run_hook_post_merge_requires_approval(repo: TestRepo) {
 /// Test that approval fails in non-TTY environment with clear error message
 ///
 /// When stdin is not a TTY (e.g., CI/CD, piped input), approval prompts cannot be shown.
-/// The command should fail with a clear error telling users to use --force.
+/// The command should fail with a clear error telling users to use --yes.
 #[rstest]
 fn test_approval_fails_in_non_tty(repo: TestRepo) {
     repo.write_project_config(r#"post-create = "echo 'test command'""#);
@@ -303,24 +302,24 @@ fn test_approval_fails_in_non_tty(repo: TestRepo) {
     });
 }
 
-/// Test that --force flag bypasses TTY requirement
+/// Test that --yes flag bypasses TTY requirement
 ///
-/// Even in non-TTY environments, --force should allow commands to execute.
+/// Even in non-TTY environments, --yes should allow commands to execute.
 #[rstest]
-fn test_force_bypasses_tty_check(repo: TestRepo) {
+fn test_yes_bypasses_tty_check(repo: TestRepo) {
     repo.write_project_config(r#"post-create = "echo 'test command'""#);
     repo.commit("Add config");
 
-    // Run with --force to bypass approval entirely
+    // Run with --yes to bypass approval entirely
     let settings = setup_snapshot_settings(&repo);
     settings.bind(|| {
         let mut cmd = make_snapshot_cmd(
             &repo,
             "switch",
-            &["--create", "test-force-tty", "--yes"],
+            &["--create", "test-yes-tty", "--yes"],
             None,
         );
-        assert_cmd_snapshot!("force_bypasses_tty_check", cmd);
+        assert_cmd_snapshot!("yes_bypasses_tty_check", cmd);
     });
 }
 
@@ -340,7 +339,7 @@ fn test_hook_post_merge_target_is_current_branch(repo: TestRepo) {
         .output()
         .unwrap();
 
-    // Run the hook with --force to skip approval
+    // Run the hook with --yes to skip approval
     let output = Command::new(env!("CARGO_BIN_EXE_wt"))
         .args(["hook", "post-merge", "--yes"])
         .current_dir(repo.root_path())
@@ -377,7 +376,7 @@ fn test_hook_pre_merge_target_is_current_branch(repo: TestRepo) {
         .output()
         .unwrap();
 
-    // Run the hook with --force to skip approval
+    // Run the hook with --yes to skip approval
     let output = Command::new(env!("CARGO_BIN_EXE_wt"))
         .args(["hook", "pre-merge", "--yes"])
         .current_dir(repo.root_path())
@@ -415,7 +414,7 @@ build = "echo 'running build' > build.txt"
     );
     repo.commit("Add pre-merge hooks");
 
-    // Run only the "lint" command with --force to skip approval
+    // Run only the "lint" command with --yes to skip approval
     let output = Command::new(env!("CARGO_BIN_EXE_wt"))
         .args(["hook", "pre-merge", "lint", "--yes"])
         .current_dir(repo.root_path())

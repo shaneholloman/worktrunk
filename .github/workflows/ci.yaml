@@ -96,7 +96,7 @@ jobs:
         crate: worktrunk
 
     - name: 🧪 Pre-merge hooks
-      run: wt hook pre-merge --force
+      run: wt hook pre-merge --yes
 
   # Check if Cargo files changed (for conditional jobs below)
   changes:
