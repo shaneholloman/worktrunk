@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.1
+
+### Improved
+
+- **Shell and PowerShell installers**: Added one-line install commands for Linux/macOS and Windows.
+- **Consistent terminology**: CLI now uses "branch name" consistently instead of mixing "worktree" and "branch". The `wt remove` argument is renamed from `worktrees` to `branches` to reflect that worktrees are addressed by branch name.
+
+### Fixed
+
+- **Switch hints**: Removed incorrect `wt switch @` hint and improved error output spacing.
+
+### Documentation
+
+- **Dev server and database patterns**: Added practical examples for running per-worktree dev servers with subdomain routing and databases with unique ports.
+
 ## 0.8.0
 
 ### Improved
