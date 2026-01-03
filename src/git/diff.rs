@@ -263,6 +263,66 @@ mod tests {
     }
 
     // ============================================================================
+    // parse_numstat_line Tests
+    // ============================================================================
+
+    #[test]
+    fn test_parse_numstat_line_basic() {
+        // Tab-separated: added<TAB>deleted<TAB>filename
+        let result = parse_numstat_line("10\t5\tfile.rs");
+        assert_eq!(result, Some((10, 5)));
+    }
+
+    #[test]
+    fn test_parse_numstat_line_insertions_only() {
+        let result = parse_numstat_line("15\t0\tfile.rs");
+        assert_eq!(result, Some((15, 0)));
+    }
+
+    #[test]
+    fn test_parse_numstat_line_deletions_only() {
+        let result = parse_numstat_line("0\t8\tfile.rs");
+        assert_eq!(result, Some((0, 8)));
+    }
+
+    #[test]
+    fn test_parse_numstat_line_binary_file() {
+        // Binary files show "-" instead of numbers
+        let result = parse_numstat_line("-\t-\timage.png");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_numstat_line_with_graph_prefix() {
+        // Git graph prefixes the numstat line with graph characters
+        let result = parse_numstat_line("| 10\t5\tfile.rs");
+        assert_eq!(result, Some((10, 5)));
+
+        // First numstat line after commit has "* | " prefix
+        let result = parse_numstat_line("* | 11\t0\tCargo.toml");
+        assert_eq!(result, Some((11, 0)));
+
+        // Subsequent numstat lines have "| " prefix
+        let result = parse_numstat_line("| 17\t3\tsrc/main.rs");
+        assert_eq!(result, Some((17, 3)));
+
+        // With ANSI colors (--color=always adds escape codes to graph)
+        // ESC[31m = red, ESC[m = reset
+        let esc = '\x1b';
+        let ansi_colored = format!("{esc}[31m|{esc}[m 11\t0\tCargo.toml");
+        let result = parse_numstat_line(&ansi_colored);
+        assert_eq!(result, Some((11, 0)));
+    }
+
+    #[test]
+    fn test_parse_numstat_line_not_numstat() {
+        // Not a numstat line
+        assert_eq!(parse_numstat_line("* abc1234 Fix bug"), None);
+        assert_eq!(parse_numstat_line(""), None);
+        assert_eq!(parse_numstat_line("regular text"), None);
+    }
+
+    // ============================================================================
     // DiffStats Tests
     // ============================================================================
 

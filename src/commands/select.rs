@@ -791,7 +791,7 @@ pub fn handle_select() -> anyhow::Result<()> {
     // List width depends on preview position:
     // - Right layout: skim splits ~50% for list, ~50% for preview
     // - Down layout: list gets full width, preview is below
-    let terminal_width = super::list::layout::get_safe_list_width();
+    let terminal_width = crate::display::get_terminal_width();
     let skim_list_width = match state.initial_layout {
         PreviewLayout::Right => terminal_width / 2,
         PreviewLayout::Down => terminal_width,
@@ -1072,62 +1072,6 @@ mod tests {
         assert!(output.contains("1: HEAD±"));
         assert!(output.contains("2: log"));
         assert!(output.contains("3: main…±"));
-    }
-
-    #[test]
-    fn test_parse_numstat_line_basic() {
-        // Tab-separated: added<TAB>deleted<TAB>filename
-        let result = parse_numstat_line("10\t5\tfile.rs");
-        assert_eq!(result, Some((10, 5)));
-    }
-
-    #[test]
-    fn test_parse_numstat_line_insertions_only() {
-        let result = parse_numstat_line("15\t0\tfile.rs");
-        assert_eq!(result, Some((15, 0)));
-    }
-
-    #[test]
-    fn test_parse_numstat_line_deletions_only() {
-        let result = parse_numstat_line("0\t8\tfile.rs");
-        assert_eq!(result, Some((0, 8)));
-    }
-
-    #[test]
-    fn test_parse_numstat_line_binary_file() {
-        // Binary files show "-" instead of numbers
-        let result = parse_numstat_line("-\t-\timage.png");
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_parse_numstat_line_with_graph_prefix() {
-        // Git graph prefixes the numstat line with graph characters
-        let result = parse_numstat_line("| 10\t5\tfile.rs");
-        assert_eq!(result, Some((10, 5)));
-
-        // First numstat line after commit has "* | " prefix
-        let result = parse_numstat_line("* | 11\t0\tCargo.toml");
-        assert_eq!(result, Some((11, 0)));
-
-        // Subsequent numstat lines have "| " prefix
-        let result = parse_numstat_line("| 17\t3\tsrc/main.rs");
-        assert_eq!(result, Some((17, 3)));
-
-        // With ANSI colors (--color=always adds escape codes to graph)
-        // ESC[31m = red, ESC[m = reset
-        let esc = '\x1b';
-        let ansi_colored = format!("{esc}[31m|{esc}[m 11\t0\tCargo.toml");
-        let result = parse_numstat_line(&ansi_colored);
-        assert_eq!(result, Some((11, 0)));
-    }
-
-    #[test]
-    fn test_parse_numstat_line_not_numstat() {
-        // Not a numstat line
-        assert_eq!(parse_numstat_line("* abc1234 Fix bug"), None);
-        assert_eq!(parse_numstat_line(""), None);
-        assert_eq!(parse_numstat_line("regular text"), None);
     }
 
     // format_log_output tests use dependency injection for deterministic time formatting.
