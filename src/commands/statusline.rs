@@ -13,6 +13,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use worktrunk::config::ProjectConfig;
 use worktrunk::git::{Repository, Worktree};
+use worktrunk::styling::{get_terminal_width, truncate_visible};
 
 use super::list::{self, CollectOptions};
 
@@ -201,7 +202,12 @@ pub fn run(claude_code: bool) -> Result<()> {
         use worktrunk::styling::fix_dim_after_color_reset;
         let reset = anstyle::Reset;
         let output = fix_dim_after_color_reset(&output);
-        output::stdout(format!("{reset} {output}"))?;
+
+        // Truncate to terminal width (Claude Code passes correct COLUMNS)
+        let max_width = get_terminal_width();
+        let output = truncate_visible(&format!("{reset} {output}"), max_width);
+
+        output::stdout(output)?;
     }
 
     Ok(())
@@ -404,6 +410,42 @@ mod tests {
             dir,
             pattern,
             branch
+        );
+    }
+
+    #[test]
+    fn test_statusline_truncation() {
+        use color_print::cformat;
+        use worktrunk::styling::truncate_visible;
+
+        // Simulate a long statusline with styled content
+        let long_line =
+            cformat!("main  <cyan>?</><dim>^</>  http://very-long-branch-name.localhost:3000");
+
+        // Truncate to 30 visible characters
+        let truncated = truncate_visible(&long_line, 30);
+
+        // Should end with ellipsis and be shorter
+        assert!(
+            truncated.contains('…'),
+            "Truncated line should contain ellipsis: {truncated}"
+        );
+
+        // Visible width should be <= 30
+        let visible: String = truncated
+            .chars()
+            .filter(|c| !c.is_ascii_control())
+            .collect();
+        // Simple check: the truncated output should be shorter than original
+        let original_visible: String = long_line
+            .chars()
+            .filter(|c| !c.is_ascii_control())
+            .collect();
+        assert!(
+            visible.len() < original_visible.len(),
+            "Truncated should be shorter: {} vs {}",
+            visible.len(),
+            original_visible.len()
         );
     }
 }
