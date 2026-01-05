@@ -11,6 +11,7 @@ info:
     GIT_EDITOR: ""
     RUST_LOG: warn
     SOURCE_DATE_EPOCH: "1735776000"
+    TERM: alacritty
     WORKTRUNK_CONFIG_PATH: /nonexistent/test/config.toml
     WORKTRUNK_TEST_SKIP_URL_HEALTH_CHECK: "1"
 ---
@@ -130,6 +131,6 @@ hooks validate before merging — if they pass, the branch goes to the default b
 
 [32mSee also
 
-- wt step — Run individual merge steps (commit, squash, rebase, push)
+- wt step — Run individual operations (commit, squash, rebase, push)
 - wt remove — Remove worktrees without merging
 - wt switch — Navigate to other worktrees

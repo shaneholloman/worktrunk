@@ -79,7 +79,7 @@ lint = "cargo clippy"
 
 ## See also
 
-- [wt step](@/step.md) — Run individual merge steps (commit, squash, rebase, push)
+- [wt step](@/step.md) — Run individual operations (commit, squash, rebase, push)
 - [wt remove](@/remove.md) — Remove worktrees without merging
 - [wt switch](@/switch.md) — Navigate to other worktrees
 
