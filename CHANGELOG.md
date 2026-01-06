@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.5
+
+### Improved
+
+- **Pager config for `wt select`**: New `[select] pager` config option to customize the diff pager in `wt select` previews. Auto-detects delta/bat when not configured.
+- **Infinity symbol for extreme diffs**: `wt list` shows `∞` instead of `9K` for diffs >= 10,000 commits, avoiding misleading values.
+
+### Fixed
+
+- **Windows shell integration message**: Warning now shows just the command name instead of the full absolute path, and gives targeted advice when only the `.exe` suffix differs.
+- **URL column width**: Column width in `wt list` now accounts for hyperlink display showing just `:PORT` instead of full URLs.
+
+### Internal
+
+- **Deprecated `template-file` and `squash-template-file`**: Legacy LLM template config options now show deprecation warnings.
+- **Path handling improvements**: Replaced string manipulation with proper Path/PathBuf stdlib methods throughout the codebase.
+
 ## 0.9.4
 
 ### Improved
