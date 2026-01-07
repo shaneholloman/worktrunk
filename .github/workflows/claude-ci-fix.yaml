@@ -67,7 +67,7 @@ jobs:
             actions: read
 
           # Provide Claude with context about the failure and instructions
-          direct_prompt: |
+          prompt: |
             CI has failed on main branch. Your job is to diagnose and fix the failure, then create a PR.
 
             ## Failed workflow information
