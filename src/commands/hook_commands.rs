@@ -9,6 +9,7 @@
 use anyhow::Context;
 use color_print::cformat;
 use std::fmt::Write as _;
+use strum::IntoEnumIterator;
 use worktrunk::HookType;
 use worktrunk::config::{CommandConfig, ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
@@ -274,13 +275,7 @@ pub fn add_approvals(show_all: bool) -> anyhow::Result<()> {
         .ok_or(GitError::ProjectConfigNotFound { config_path })?;
 
     // Collect all commands from the project config
-    let all_hooks = [
-        HookType::PostCreate,
-        HookType::PostStart,
-        HookType::PreCommit,
-        HookType::PreMerge,
-        HookType::PostMerge,
-    ];
+    let all_hooks: Vec<_> = HookType::iter().collect();
     let commands = collect_commands_for_hooks(&project_config, &all_hooks);
 
     if commands.is_empty() {

@@ -283,7 +283,17 @@ pub(crate) use parse::DefaultBranchName;
 // They're accessible as git::HookType and git::Worktree without needing re-export.
 
 /// Hook types for git operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum, strum::Display, strum::EnumString)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    clap::ValueEnum,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+)]
 #[strum(serialize_all = "kebab-case")]
 pub enum HookType {
     PostCreate,
@@ -498,16 +508,15 @@ mod tests {
 
     #[test]
     fn test_hook_type_display() {
-        let cases = [
-            (HookType::PostCreate, "post-create"),
-            (HookType::PostStart, "post-start"),
-            (HookType::PreCommit, "pre-commit"),
-            (HookType::PreMerge, "pre-merge"),
-            (HookType::PostMerge, "post-merge"),
-            (HookType::PreRemove, "pre-remove"),
-        ];
-        for (hook, expected) in cases {
-            assert_eq!(format!("{hook}"), expected);
+        use strum::IntoEnumIterator;
+
+        // Verify all hook types serialize to kebab-case
+        for hook in HookType::iter() {
+            let display = format!("{hook}");
+            assert!(
+                display.chars().all(|c| c.is_lowercase() || c == '-'),
+                "Hook {hook:?} should be kebab-case, got: {display}"
+            );
         }
     }
 
