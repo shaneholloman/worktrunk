@@ -256,3 +256,36 @@ grep -A 20 "## Setup" reference/llm-commits.md
 grep -A 30 "### post-create" reference/hook.md
 grep -A 20 "## Warning Messages" reference/shell-integration.md
 ```
+
+## Advanced: Agent Handoffs
+
+When the user requests spawning a worktree with Claude in a background session ("spawn a worktree for...", "hand off to another agent"), use the appropriate pattern for their terminal multiplexer:
+
+**tmux** (check `$TMUX` env var):
+```bash
+tmux new-session -d -s <branch-name> "wt switch --create <branch-name> -x claude -- '<task description>'"
+```
+
+**Zellij** (check `$ZELLIJ` env var):
+```bash
+zellij run -- wt switch --create <branch-name> -x claude -- '<task description>'
+```
+
+**Requirements** (all must be true):
+- User explicitly requests spawning/handoff
+- User is in a supported multiplexer (tmux or Zellij)
+- User's CLAUDE.md or explicit instruction authorizes this pattern
+
+**Do not use this pattern** for normal worktree operations.
+
+Example (tmux):
+```bash
+tmux new-session -d -s fix-auth-bug "wt switch --create fix-auth-bug -x claude -- \
+  'The login session expires after 5 minutes. Find the session timeout config and extend it to 24 hours.'"
+```
+
+Example (Zellij):
+```bash
+zellij run -- wt switch --create fix-auth-bug -x claude -- \
+  'The login session expires after 5 minutes. Find the session timeout config and extend it to 24 hours.'
+```

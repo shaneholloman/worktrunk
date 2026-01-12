@@ -206,6 +206,31 @@ wt switch --create feature-part2 --base=@
 
 Creates a worktree that builds on the current branch's changes.
 
+## Agent handoffs
+
+Spawn a worktree with Claude running in the background:
+
+**tmux** (new detached session):
+```bash
+tmux new-session -d -s fix-auth-bug "wt switch --create fix-auth-bug -x claude -- \
+  'The login session expires after 5 minutes. Find the session timeout config and extend it to 24 hours.'"
+```
+
+**Zellij** (new pane in current session):
+```bash
+zellij run -- wt switch --create fix-auth-bug -x claude -- \
+  'The login session expires after 5 minutes. Find the session timeout config and extend it to 24 hours.'
+```
+
+This lets one Claude session hand off work to another that runs in the background. Hooks run inside the multiplexer session/pane.
+
+The [worktrunk skill](@/claude-code.md) includes guidance for Claude Code to execute this pattern. To enable it, request it explicitly ("spawn a parallel worktree for...") or add to `CLAUDE.md`:
+
+```markdown
+When I ask you to spawn parallel worktrees, use the agent handoff pattern
+from the worktrunk skill.
+```
+
 ## Bare repository layout
 
 An alternative to the default sibling layout (`myproject.feature/`) uses a bare repository with worktrees as subdirectories:
