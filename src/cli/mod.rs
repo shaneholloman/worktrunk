@@ -1467,14 +1467,7 @@ fi
 
     /// Manage configuration and shell integration
     #[command(
-        after_long_help = r#"Manages configuration, shell integration, and runtime settings.
-
-Worktrunk uses two configuration files:
-
-| File | Location | Purpose |
-|------|----------|---------|
-| **User config** | `~/.config/worktrunk/config.toml` | Personal settings, command defaults, approved project commands |
-| **Project config** | `.config/wt.toml` | Lifecycle hooks, checked into version control |
+        after_long_help = concat!(r#"Manages configuration, shell integration, and runtime settings.
 
 ## Examples
 
@@ -1502,75 +1495,104 @@ Show current configuration and file locations:
 wt config show
 ```
 
-## User config
+## Configuration files
 
-The user config stores personal preferences that apply across all repositories. Create it with `wt config create` and view with `wt config show`.
+| File | Location | Purpose |
+|------|----------|---------|
+| **User config** | `~/.config/worktrunk/config.toml` | Personal settings, command defaults, approved project commands |
+| **Project config** | `.config/wt.toml` | Lifecycle hooks, checked into version control |
 
-### Worktree path template
+<!-- USER_CONFIG_START -->
+# Worktrunk User Configuration
 
-Controls where new worktrees are created. The template is relative to the repository root.
+Create with `wt config create`.
 
-**Available variables:**
+Location:
+
+- macOS/Linux: `~/.config/worktrunk/config.toml` (or `$XDG_CONFIG_HOME` if set)
+- Windows: `%APPDATA%\worktrunk\config.toml`
+
+## Worktree Path Template
+
+Controls where new worktrees are created. Paths are relative to the repository root.
+
+**Variables:**
+
 - `{{ repo }}` — repository directory name
 - `{{ branch }}` — raw branch name (e.g., `feature/auth`)
-- `{{ branch | sanitize }}` — branch name with `/` and `\` replaced by `-`
+- `{{ branch | sanitize }}` — filesystem-safe: `/` and `\` become `-` (e.g., `feature-auth`)
+- `{{ branch | sanitize_db }}` — database-safe: lowercase, underscores, hash suffix (e.g., `feature_auth_x7k`)
 
-**Examples** for a repo at `~/code/myproject` creating branch `feature/login`:
+**Examples** for repo at `~/code/myproject`, branch `feature/auth`:
 
 ```toml
 # Default — siblings in parent directory
-# Creates: ~/code/myproject.feature-login
+# Creates: ~/code/myproject.feature-auth
 worktree-path = "../{{ repo }}.{{ branch | sanitize }}"
 
 # Inside the repository
-# Creates: ~/code/myproject/.worktrees/feature-login
+# Creates: ~/code/myproject/.worktrees/feature-auth
 worktree-path = ".worktrees/{{ branch | sanitize }}"
 
 # Namespaced (useful when multiple repos share a parent directory)
-# Creates: ~/code/worktrees/myproject/feature-login
+# Creates: ~/code/worktrees/myproject/feature-auth
 worktree-path = "../worktrees/{{ repo }}/{{ branch | sanitize }}"
 
 # Nested bare repo (git clone --bare <url> project/.git)
-# Creates: ~/code/project/feature-login (sibling to .git)
+# Creates: ~/code/project/feature-auth (sibling to .git)
 worktree-path = "../{{ branch | sanitize }}"
 ```
 
-### Command settings
+## List Command Defaults
 
-Set persistent flag values for commands. These apply unless explicitly overridden on the command line.
-
-**`wt list`:**
+Persistent flag values for `wt list`. Override on command line as needed.
 
 ```toml
 [list]
-# All off by default
-full = true      # --full
-branches = true  # --branches
-remotes = true   # --remotes
+full = false       # Show CI status and main…± diffstat columns (--full)
+branches = false   # Include branches without worktrees (--branches)
+remotes = false    # Include remote-only branches (--remotes)
 ```
 
-**`wt step commit` and `wt merge` staging:**
+## Commit Defaults
+
+Shared by `wt step commit`, `wt step squash`, and `wt merge`.
 
 ```toml
 [commit]
-stage = "all"    # "all" (default), "tracked", or "none"
+stage = "all"      # What to stage before commit: "all", "tracked", or "none"
 ```
 
-**`wt merge`:**
+## Merge Command Defaults
+
+All flags are on by default. Set to false to change default behavior.
 
 ```toml
 [merge]
-# These flags are on by default; set to false to disable
-squash = false  # Preserve individual commits (--no-squash)
-commit = false  # Skip committing uncommitted changes (also disables squash)
-rebase = false  # Skip rebase (fails if not already rebased)
-remove = false  # Keep worktree after merge (--no-remove)
-verify = false  # Skip hooks (--no-verify)
+squash = true      # Squash commits into one (--no-squash to preserve history)
+commit = true      # Commit uncommitted changes first (--no-commit to skip)
+rebase = true      # Rebase onto target before merge (--no-rebase to skip)
+remove = true      # Remove worktree after merge (--no-remove to keep)
+verify = true      # Run project hooks (--no-verify to skip)
 ```
 
-### LLM commit messages
+## Select Command Defaults
 
-Configure automatic commit message generation. Requires an external tool like [llm](https://llm.datasette.io/):
+Pager behavior for `wt select` diff previews.
+
+```toml
+[select]
+# Pager command with flags for diff preview (overrides git's core.pager)
+# Use this to specify pager flags needed for non-TTY contexts
+# Example:
+# pager = "delta --paging=never"
+```
+
+## LLM Commit Messages
+
+Generate commit messages automatically during merge. Requires an external CLI tool. See <https://worktrunk.dev/llm-commits/> for setup details and template customization.
+
+Using [llm](https://github.com/simonw/llm) (install: `pip install llm llm-anthropic`):
 
 ```toml
 [commit-generation]
@@ -1578,34 +1600,119 @@ command = "llm"
 args = ["-m", "claude-haiku-4.5"]
 ```
 
-See [LLM Commit Messages](@/llm-commits.md) for setup details and template customization.
-
-### Approved commands
-
-When project hooks run for the first time, Worktrunk prompts for approval. Approved commands are saved here automatically:
+Using [aichat](https://github.com/sigoden/aichat):
 
 ```toml
-[projects."my-project"]
+[commit-generation]
+command = "aichat"
+args = ["-m", "claude:claude-haiku-4.5"]
+```
+
+See [Custom Prompt Templates](#custom-prompt-templates) for inline template options.
+
+## Approved Commands
+
+Commands approved for project hooks. Auto-populated when approving hooks on first run, or via `wt hook approvals add`.
+
+```toml
+[projects."github.com/user/repo"]
 approved-commands = ["npm ci", "npm test"]
 ```
 
-Manage approvals with `wt hook approvals add` to review and pre-approve commands, and `wt hook approvals clear` to reset (add `--global` to clear all projects).
+For project-specific hooks (post-create, post-start, pre-merge, etc.), use a project config at `<repo>/.config/wt.toml`. Run `wt config create --project` to create one, or see <https://worktrunk.dev/hook/>.
 
-### User hooks
+## Custom Prompt Templates
 
-Personal hooks that run for all repositories. Use the same syntax as project hooks:
+Templates use [minijinja](https://docs.rs/minijinja/) syntax.
 
+### Commit Template
+
+Available variables:
+
+- `{{ git_diff }}`, `{{ git_diff_stat }}` — diff content
+- `{{ branch }}`, `{{ repo }}` — context
+- `{{ recent_commits }}` — recent commit messages
+
+Default template:
+
+<!-- DEFAULT_TEMPLATE_START -->
 ```toml
-[post-create]
-setup = "echo 'Setting up worktree...'"
+[commit-generation]
+template = """
+Write a commit message for the staged changes below.
 
-[pre-merge]
-notify = "notify-send 'Merging {{ branch }}'"
+<format>
+- Subject under 50 chars, blank line, then optional body
+- Output only the commit message, no quotes or code blocks
+</format>
+
+<style>
+- Imperative mood: "Add feature" not "Added feature"
+- Match recent commit style (conventional commits if used)
+- Describe the change, not the intent or benefit
+</style>
+
+<diffstat>
+{{ git_diff_stat }}
+</diffstat>
+
+<diff>
+{{ git_diff }}
+</diff>
+
+<context>
+Branch: {{ branch }}
+{% if recent_commits %}<recent_commits>
+{% for commit in recent_commits %}- {{ commit }}
+{% endfor %}</recent_commits>{% endif %}
+</context>
+
+"""
 ```
+<!-- DEFAULT_TEMPLATE_END -->
 
-User hooks run before project hooks and don't require approval. Skip with `--no-verify`.
+### Squash Template
 
-See [`wt hook`](@/hook.md#user-hooks) for complete documentation.
+Available variables (in addition to commit template variables):
+
+- `{{ commits }}` — list of commits being squashed
+- `{{ target_branch }}` — merge target branch
+
+Default template:
+
+<!-- DEFAULT_SQUASH_TEMPLATE_START -->
+```toml
+[commit-generation]
+squash-template = """
+Combine these commits into a single commit message.
+
+<format>
+- Subject under 50 chars, blank line, then optional body
+- Output only the commit message, no quotes or code blocks
+</format>
+
+<style>
+- Imperative mood: "Add feature" not "Added feature"
+- Match the style of commits being squashed (conventional commits if used)
+- Describe the change, not the intent or benefit
+</style>
+
+<commits branch="{{ branch }}" target="{{ target_branch }}">
+{% for commit in commits %}- {{ commit }}
+{% endfor %}</commits>
+
+<diffstat>
+{{ git_diff_stat }}
+</diffstat>
+
+<diff>
+{{ git_diff }}
+</diff>
+
+"""
+```
+<!-- DEFAULT_SQUASH_TEMPLATE_END -->
+<!-- USER_CONFIG_END -->
 
 ## Project config
 
@@ -1731,12 +1838,10 @@ WORKTRUNK_COMMIT_GENERATION__ARGS="test: automated commit" \
 | `NO_COLOR` | Disable colored output ([standard](https://no-color.org/)) |
 | `CLICOLOR_FORCE` | Force colored output even when not a TTY |
 
-<!-- subdoc: create -->
-
 <!-- subdoc: show -->
 
 <!-- subdoc: state -->
-"#
+"#)
     )]
     Config {
         #[command(subcommand)]
