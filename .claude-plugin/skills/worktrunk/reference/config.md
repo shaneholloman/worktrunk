@@ -28,7 +28,7 @@ Show current configuration and file locations:
 wt config show
 ```
 
-# Configuration files
+## Configuration files
 
 | File | Location | Purpose |
 |------|----------|---------|
@@ -247,7 +247,7 @@ Combine these commits into a single commit message.
 <!-- DEFAULT_SQUASH_TEMPLATE_END -->
 <!-- USER_CONFIG_END -->
 
-# Project config
+## Project config
 
 The project config defines lifecycle hooks and project-specific settings. This file is checked into version control and shared across the team.
 
@@ -286,7 +286,7 @@ platform = "github"  # or "gitlab"
 
 By default, the platform is detected from the remote URL. Use this when URL detection fails (e.g., `git.mycompany.com` instead of `github.mycompany.com`).
 
-# Shell integration
+## Shell integration
 
 Worktrunk needs shell integration to change directories when switching worktrees. Install with:
 
