@@ -31,7 +31,7 @@
 // =============================================================================
 
 // Shared imports (both platforms)
-use crate::common::TestRepo;
+use crate::common::{TestRepo, shell::get_shell_binary};
 use insta_cmd::get_cargo_bin;
 use std::process::Command;
 
@@ -330,14 +330,6 @@ fn build_shell_script(shell: &str, repo: &TestRepo, subcommand: &str, args: &[&s
 /// );
 /// // The output will show: "Allow? [y/N] y"
 /// ```
-/// Get the actual shell binary name (handles powershell -> pwsh mapping)
-fn get_shell_binary(shell: &str) -> &str {
-    match shell {
-        "powershell" => "pwsh",
-        _ => shell,
-    }
-}
-
 #[cfg(test)]
 fn exec_in_pty_interactive(
     shell: &str,
