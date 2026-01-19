@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.0
+
+### Improved
+
+- **Background hook verbosity**: Background hooks (post-start, post-switch) now show a single-line summary by default instead of per-hook output. Use `-v` to see detailed output with expanded commands. We're open to feedback on this change — let us know in [#690](https://github.com/max-sixty/worktrunk/issues/690). (thanks @clutchski for reporting)
+
+### Internal
+
+- Fixed dead Apple documentation link in copy-ignored rationale. ([#743](https://github.com/max-sixty/worktrunk/pull/743))
+
 ## 0.15.5
 
 ### Fixed
