@@ -19,6 +19,8 @@ Hooks are shell commands that run at key points in the worktree lifecycle — au
 **Blocking**: Command waits for hook to complete before continuing.
 **Fail-fast**: First failure aborts the operation.
 
+Background hooks show a single-line summary by default. Use `-v` to see expanded command details.
+
 ### post-start
 
 Dev servers, long builds, file watchers, copying caches. Output logged to `.git/wt-logs/{branch}-{source}-post-start-{name}.log`.
@@ -429,7 +431,7 @@ Usage: <b><span class=c>wt hook</span></b> <span class=c>[OPTIONS]</span> <span 
           User config file path
 
   <b><span class=c>-v</span></b>, <b><span class=c>--verbose</span></b><span class=c>...</span>
-          Show debug info and write diagnostic report (-vv)
+          Verbose output (-v: hooks, templates; -vv: debug report)
 
 ## wt hook approvals
 
@@ -478,4 +480,4 @@ Usage: <b><span class=c>wt hook approvals</span></b> <span class=c>[OPTIONS]</sp
           User config file path
 
   <b><span class=c>-v</span></b>, <b><span class=c>--verbose</span></b><span class=c>...</span>
-          Show debug info and write diagnostic report (-vv)
+          Verbose output (-v: hooks, templates; -vv: debug report)

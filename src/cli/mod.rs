@@ -225,7 +225,7 @@ pub(crate) struct Cli {
     )]
     pub config: Option<std::path::PathBuf>,
 
-    /// Show debug info and write diagnostic report (-vv)
+    /// Verbose output (-v: hooks, templates; -vv: debug report)
     #[arg(
         long,
         short = 'v',
@@ -1036,6 +1036,8 @@ wt step push
 
 **Blocking**: Command waits for hook to complete before continuing.
 **Fail-fast**: First failure aborts the operation.
+
+Background hooks show a single-line summary by default. Use `-v` to see expanded command details.
 
 ### post-start
 
