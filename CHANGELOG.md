@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.5
+
+### Fixed
+
+- **Hook execution order**: Hooks now run in the order defined in the config file. Previously, HashMap iteration randomized the order. Fixes [#737](https://github.com/max-sixty/worktrunk/issues/737). (thanks @ngotchac for reporting)
+
 ## 0.15.4
 
 ### Improved
