@@ -277,6 +277,8 @@ When investigating uncovered lines:
    - Edge cases in shell integration states (e.g., running as `git wt`)
    - Test assertion code (only executes when tests fail)
 
+Code that only runs on test failure (assertion messages, custom panic handlers) shows as uncovered since tests pass. Keep this code minimal — useful for debugging but a rarely-traveled path.
+
 ## Benchmarks
 
 See `benches/CLAUDE.md` for details.
