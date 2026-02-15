@@ -31,4 +31,4 @@ exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-[2m○[22m Nothing to squash; no commits ahead of main
+[2m○[22m Nothing to squash; already a single commit

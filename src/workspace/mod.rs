@@ -159,7 +159,7 @@ pub trait Workspace: Send + Sync {
 
     /// Resolve the integration target (branch/bookmark to rebase onto).
     /// Git: validates ref exists, falls back to default branch.
-    /// Jj: uses `default_branch_name()` detection chain (config, trunk, local bookmarks).
+    /// Jj: detects trunk bookmark.
     fn resolve_integration_target(&self, target: Option<&str>) -> anyhow::Result<String>;
 
     /// Whether the current workspace is already rebased onto `target`.

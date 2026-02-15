@@ -75,9 +75,8 @@ impl JjWorkspace {
 
     /// Detect the bookmark name associated with `trunk()`.
     ///
-    /// Returns `None` if no bookmarks are found on the `trunk()` revset
-    /// (common in local-only repos without remote tracking).
-    fn trunk_bookmark(&self) -> anyhow::Result<Option<String>> {
+    /// Falls back to `"main"` if no bookmark is found.
+    pub fn trunk_bookmark(&self) -> anyhow::Result<String> {
         let output = self.run_command(&[
             "log",
             "-r",
@@ -90,29 +89,15 @@ impl JjWorkspace {
 
         // Prefer "main", then "master", then first found
         if bookmarks.contains(&"main") {
-            Ok(Some("main".to_string()))
+            Ok("main".to_string())
         } else if bookmarks.contains(&"master") {
-            Ok(Some("master".to_string()))
+            Ok("master".to_string())
         } else {
-            Ok(bookmarks.first().map(|s| s.to_string()))
+            Ok(bookmarks
+                .first()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "main".to_string()))
         }
-    }
-
-    /// Check if common default branch bookmarks ("main", "master") exist locally.
-    ///
-    /// Used as a fallback when `trunk()` doesn't resolve to a bookmark (e.g.,
-    /// local-only repos without remote tracking).
-    fn find_local_default_bookmark(&self) -> Option<String> {
-        let output = self
-            .run_command(&["bookmark", "list", "-T", r#"name ++ "\n""#])
-            .ok()?;
-        let bookmarks: Vec<&str> = output.lines().filter(|l| !l.is_empty()).collect();
-        for candidate in ["main", "master"] {
-            if bookmarks.contains(&candidate) {
-                return Some(candidate.to_string());
-            }
-        }
-        None
     }
 
     /// Determine the feature tip change ID.
@@ -286,12 +271,8 @@ impl Workspace for JjWorkspace {
         {
             return Some(name);
         }
-        // Fall back to trunk() revset detection (requires remote bookmarks)
-        if let Some(name) = self.trunk_bookmark().ok().flatten() {
-            return Some(name);
-        }
-        // Local-only repos: check if common default branch bookmarks exist
-        self.find_local_default_bookmark()
+        // Fall back to trunk() revset detection
+        self.trunk_bookmark().ok()
     }
 
     fn set_default_branch(&self, name: &str) -> anyhow::Result<()> {
@@ -381,9 +362,7 @@ impl Workspace for JjWorkspace {
     fn resolve_integration_target(&self, target: Option<&str>) -> anyhow::Result<String> {
         match target {
             Some(t) => Ok(t.to_string()),
-            None => self.default_branch_name().ok_or_else(|| {
-                anyhow::anyhow!("Cannot determine default branch. Specify target explicitly or run: wt config state default-branch set BRANCH")
-            }),
+            None => self.trunk_bookmark(),
         }
     }
 
