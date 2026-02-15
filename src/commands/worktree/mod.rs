@@ -91,7 +91,7 @@ pub use resolve::{
     compute_worktree_path, get_path_mismatch, is_worktree_at_expected_path, resolve_worktree_arg,
     worktree_display_name,
 };
-pub use switch::{execute_switch, plan_switch};
+pub use switch::{execute_switch, plan_switch, resolve_path_mismatch};
 pub use types::{
     BranchDeletionMode, OperationMode, RemoveResult, SwitchBranchInfo, SwitchPlan, SwitchResult,
 };

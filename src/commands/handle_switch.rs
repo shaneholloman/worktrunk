@@ -13,7 +13,7 @@ use worktrunk::workspace::build_worktree_map;
 use super::command_approval::approve_hooks;
 use super::command_executor::{CommandContext, build_hook_context};
 use super::worktree::{
-    SwitchBranchInfo, SwitchPlan, SwitchResult, execute_switch, get_path_mismatch, plan_switch,
+    SwitchPlan, SwitchResult, execute_switch, plan_switch, resolve_path_mismatch,
 };
 use crate::output::{
     execute_user_command, handle_switch_output, is_shell_integration_active,
@@ -175,16 +175,7 @@ pub fn handle_switch(
     }
 
     // Compute path mismatch lazily (deferred from plan_switch for existing worktrees)
-    let branch_info = match &result {
-        SwitchResult::Existing { path } | SwitchResult::AlreadyAt(path) => {
-            let expected_path = get_path_mismatch(repo, &branch_info.branch, path, config);
-            SwitchBranchInfo {
-                expected_path,
-                ..branch_info
-            }
-        }
-        _ => branch_info,
-    };
+    let branch_info = resolve_path_mismatch(branch_info, &result, repo, config);
 
     // Show success message (temporal locality: immediately after worktree operation)
     // Returns path to display in hooks when user's shell won't be in the worktree
