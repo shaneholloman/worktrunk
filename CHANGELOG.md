@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.1
+
+### Fixed
+
+- **Statusline panic without LLM config**: `wt list statusline` panicked when no LLM command was configured. Now skips summary generation gracefully. ([#1107](https://github.com/max-sixty/worktrunk/pull/1107))
+
+### Internal
+
+- Demo GIFs now show the Summary column in `wt list --full` output. ([#1104](https://github.com/max-sixty/worktrunk/pull/1104), [#1106](https://github.com/max-sixty/worktrunk/pull/1106))
+- CI session log uploads fixed to use correct path. ([#1103](https://github.com/max-sixty/worktrunk/pull/1103))
+
 ## 0.26.0
 
 ### Improved
