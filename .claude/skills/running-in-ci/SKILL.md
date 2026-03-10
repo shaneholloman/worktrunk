@@ -40,6 +40,35 @@ When the triggering comment asks for a PR (e.g., "make a new PR", "open a PR",
 "create a PR"), create it directly with `gh pr create`. The comment is the
 user's explicit request — don't downgrade it to a compare link.
 
+## Fork PRs
+
+Before pushing commits to a PR branch, check whether it's a fork PR:
+
+```bash
+gh pr view <number> --json headRepositoryOwner --jq '.headRepositoryOwner.login'
+```
+
+If the owner is **not** `max-sixty`, it's a fork PR. The key rule: **never
+create new branches on `origin`** — that pushes to the upstream repo, not the
+fork.
+
+Instead, push directly to the fork's PR branch:
+
+```bash
+# Checks out the PR branch and sets up the fork remote automatically
+gh pr checkout <number>
+
+# After making changes, push back to the fork
+git push
+```
+
+If pushing to the fork fails (e.g., "Allow edits from maintainers" is disabled),
+fall back to posting suggested changes as code snippets in a comment.
+
+When posting code from work you did locally, do not reference commit SHAs from
+temporary or deleted branches — those links will 404. Post the code inline
+instead.
+
 ## CI Monitoring
 
 After pushing changes to a PR branch, you **must** wait for CI before saying
