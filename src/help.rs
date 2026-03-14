@@ -4,6 +4,42 @@
 //! - Pager support for `--help` output (git-style)
 //! - Markdown rendering for help text
 //! - Web documentation generation via `--help-page` and `--help-md`
+//!
+//! # Web docs generation (`--help-page`)
+//!
+//! Each command page flows through several transforms before becoming web docs:
+//!
+//! ```text
+//! cli.rs (source of truth)
+//!   ├── after_long_help: markdown prose with [experimental] markers, `●` dots, plain URLs
+//!   └── doc comments (/// lines): definition + subtitle for lead paragraph
+//!         │
+//!         ▼
+//! combine_command_docs()         — assembles "definition. subtitle\n\n<after_long_help>"
+//!         │
+//!         ▼
+//! post_process_for_html()        — text replacements on after_long_help markdown:
+//!         │                        [experimental] → badge <span>
+//!         │                        `●` green → colored <span>
+//!         │                        plain URLs → markdown links
+//!         ▼
+//! --help-page stdout             — markdown with embedded HTML spans
+//!         │
+//!         ▼  (readme_sync.rs test captures and writes to docs/)
+//!         │
+//! convert_command_reference_to_html()  — backtick-fenced --help blocks → {% terminal() %}
+//! expand_command_placeholders()        — ```bash wt list``` → snapshot terminal blocks
+//!         │
+//!         ▼
+//! docs/content/{command}.md      — final markdown consumed by Zola
+//! ```
+//!
+//! **Manually-written pages** (faq.md, llm-commits.md) bypass this pipeline.
+//! They use `{{ experimental() }}` (Zola shortcode) for badges.
+//!
+//! **Skill reference files** mirror docs/ content via `transform_docs_for_skill()`,
+//! which strips Zola syntax (terminal shortcodes, `{{ experimental() }}` → `[experimental]`)
+//! for plain-markdown consumption.
 
 use std::process;
 
@@ -341,7 +377,7 @@ Commands with pages: merge, switch, remove, list"
     // Process main content (before subdocs)
     let main_help = {
         let text = expand_demo_placeholders(main_content);
-        colorize_ci_status_for_html(&text)
+        post_process_for_html(&text)
     };
 
     // Get the help reference block (wrap at 80 chars for web docs, with colors for HTML)
@@ -366,28 +402,37 @@ Commands with pages: merge, switch, remove, list"
     std::println!();
     std::println!("```");
 
-    // Subdocs follow, each with their own command reference at the end
+    // Subdocs follow, each with their own command reference at the end.
+    // post_process_for_html is already applied inside format_subcommand_section,
+    // so we don't apply it again here (it would corrupt HTML inside reference blocks).
     if let Some(subdocs) = subdoc_content {
         let subdocs_expanded = expand_subdoc_placeholders(subdocs, sub, &parent_name);
-        let subdocs_processed = colorize_ci_status_for_html(&subdocs_expanded);
         std::println!();
         std::println!("# Subcommands");
         std::println!();
-        std::println!("{}", subdocs_processed.trim());
+        std::println!("{}", subdocs_expanded.trim());
     }
 
     std::println!();
     std::println!("<!-- END AUTO-GENERATED from `wt {subcommand} --help-page` -->");
 }
 
-/// Add HTML color spans for CI status dots in help page output.
+/// Post-process CLI help content for web docs rendering.
 ///
-/// Transforms plain text like "`●` green" into colored HTML spans for web rendering.
-/// This is the web-docs counterpart to md_help::colorize_status_symbols() which
-/// produces ANSI codes for terminal output.
+/// Applies text replacements to `after_long_help` content before it becomes markdown
+/// in the docs site. Each replacement converts a CLI-friendly marker into styled HTML:
 ///
-/// Also converts plain URL references to markdown links for web docs.
-fn colorize_ci_status_for_html(text: &str) -> String {
+/// | CLI source | Web docs |
+/// |------------|----------|
+/// | `` `●` green `` | `<span style='color:#0a0'>●</span> green` |
+/// | `[experimental]` | `<span class="badge-experimental">experimental</span>` |
+/// | plain URL | markdown link |
+///
+/// Only runs on `after_long_help` markdown — not on terminal reference blocks (those go
+/// through ANSI-to-HTML via `convert_command_reference_to_html` in readme_sync.rs).
+///
+/// The terminal counterpart is `md_help::colorize_status_symbols()`.
+fn post_process_for_html(text: &str) -> String {
     text
         // CI status colors (in table cells)
         .replace("`●` green", "<span style='color:#0a0'>●</span> green")
@@ -396,6 +441,11 @@ fn colorize_ci_status_for_html(text: &str) -> String {
         .replace("`●` yellow", "<span style='color:#a60'>●</span> yellow")
         .replace("`⚠` yellow", "<span style='color:#a60'>⚠</span> yellow")
         .replace("`●` gray", "<span style='color:#888'>●</span> gray")
+        // Experimental badges — styled pill labels for web docs
+        .replace(
+            "[experimental]",
+            "<span class=\"badge-experimental\">experimental</span>",
+        )
         // Convert plain URL references to markdown links for web docs
         // CLI shows: "Open an issue at https://github.com/max-sixty/worktrunk."
         // Web shows: "[Open an issue](https://github.com/max-sixty/worktrunk/issues)."
@@ -533,7 +583,7 @@ fn format_subcommand_section(
     // Process main content (before any nested subdocs)
     let main_help = {
         let text = increase_heading_levels(main_content);
-        colorize_ci_status_for_html(&text)
+        post_process_for_html(&text)
     };
 
     // Build command path from parent_name: "wt config" -> ["config", "create"]
@@ -560,12 +610,13 @@ fn format_subcommand_section(
     section.push_str(reference_block.trim());
     section.push_str("\n```\n");
 
-    // Expand nested subdocs after the command reference
+    // Expand nested subdocs after the command reference.
+    // post_process_for_html is already applied inside format_subcommand_section,
+    // so we don't apply it again here (it would corrupt HTML inside reference blocks).
     if let Some(subdocs) = subdoc_content {
         let subdocs_expanded = expand_subdoc_placeholders(subdocs, sub, &full_command);
-        let subdocs_processed = colorize_ci_status_for_html(&subdocs_expanded);
         section.push('\n');
-        section.push_str(subdocs_processed.trim());
+        section.push_str(subdocs_expanded.trim());
         section.push('\n');
     }
 
