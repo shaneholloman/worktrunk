@@ -320,7 +320,13 @@ Git worktrees share the repository but not untracked files. [`wt step copy-ignor
 copy = "wt step copy-ignored"
 ```
 
-Use `post-create` instead if subsequent hooks or `--execute` command need the copied files immediately.
+Use `post-create` instead if subsequent hooks need the copied files — for example, copying `node_modules/` before `pnpm install` so the install reuses cached packages:
+
+```toml
+[post-create]
+copy = "wt step copy-ignored"
+install = "pnpm install"
+```
 
 ## Dev servers
 
