@@ -1014,7 +1014,7 @@ fn test_switch_detached_worktree_by_path(mut repo: TestRepo) {
     );
 }
 
-/// Switch to a detached worktree by relative path.
+/// Switch to a detached worktree by relative path (#1661).
 /// Relative paths with directory separators (e.g., "../repo.feature") are resolved against CWD.
 #[rstest]
 fn test_switch_detached_worktree_by_relative_path(mut repo: TestRepo) {
