@@ -465,16 +465,6 @@ pub fn handle_state_get(
                 println!("{status_str}");
             }
         }
-        // TODO: Consider simplifying to just print the path and let users run `ls -al` themselves
-        "logs" => {
-            let mut out = String::new();
-            render_all_log_sections(&mut out, &repo)?;
-
-            // Display through pager (fall back to stderr if pager unavailable)
-            if show_help_in_pager(&out, true).is_err() {
-                eprintln!("{}", out);
-            }
-        }
         _ => {
             anyhow::bail!(
                 "Unknown key: {key}. Valid keys: default-branch, previous-branch, ci-status, marker, logs"

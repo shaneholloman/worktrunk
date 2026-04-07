@@ -585,7 +585,7 @@ State is stored in `.git/` (config entries and log files), separate from configu
 - **ci-status**: CI/PR status for a branch (passed, running, failed, conflicts, no-ci, error)
 - **marker**: Custom status marker for a branch (shown in `wt list`)
 - **vars**: [experimental] Custom variables per branch
-- **logs**: Background operation logs
+- **logs**: Operation and debug logs
 
 ### Examples
 
@@ -636,7 +636,7 @@ Commands:
   previous-branch  Previous branch (for wt switch -)
   ci-status        CI status cache
   marker           Branch markers
-  logs             Background operation logs
+  logs             Operation and debug logs
   hints            One-time hints shown in this repo
   vars             [experimental] Custom variables per branch
   get              Get all stored state
@@ -908,9 +908,9 @@ Global Options:
 
 ## wt config state logs
 
-Background operation logs.
+Operation and debug logs.
 
-View and manage logs from background operations.
+View and manage log files — hook output, command audit trail, and debug diagnostics.
 
 ### What's logged
 
@@ -918,16 +918,27 @@ Three kinds of logs live in `.git/wt/logs/`:
 
 #### Command log (`commands.jsonl`)
 
-All hook executions and LLM commands are recorded automatically — one JSON object per line with timestamp, command, exit code, and duration. Rotates to `commands.jsonl.old` at 1MB (~2MB total).
+All hook executions and LLM commands are recorded automatically — one JSON object per line. Rotates to `commands.jsonl.old` at 1MB (~2MB total). Fields:
+
+| Field | Description |
+|-------|-------------|
+| `ts` | ISO 8601 timestamp |
+| `wt` | The `wt` command that triggered this (e.g., `wt hook pre-merge --yes`) |
+| `label` | What ran (e.g., `pre-merge user:lint`, `commit.generation`) |
+| `cmd` | Shell command executed |
+| `exit` | Exit code (`null` for background commands) |
+| `dur_ms` | Duration in milliseconds (`null` for background commands) |
+
+The command log appends entries and is not branch-specific — it records all activity across all worktrees.
 
 #### Hook output logs
 
 | Operation | Log file |
 |-----------|----------|
-| post-start hooks | `{branch}-{source}-post-start-{name}.log` |
-| Background removal | `{branch}-remove.log` |
+| Background hooks | `{branch}-{hash}-{source}-{hook-type}-{name}-{hash}.log` |
+| Background removal | `{branch}-{hash}-remove.log` |
 
-Source is `user` or `project` depending on where the hook is defined.
+All `post-*` hooks (post-start, post-switch, post-commit, post-merge) run in the background and produce log files. Source is `user` or `project`. Hash suffixes are added by filename sanitization. Same operation on same branch overwrites the previous log. Logs from deleted branches remain until manually cleared.
 
 #### Diagnostic files
 
@@ -940,13 +951,7 @@ Source is `user` or `project` depending on where the hook is defined.
 
 ### Location
 
-All logs are stored in `.git/wt/logs/` (in the main worktree's git directory).
-
-### Behavior
-
-- **Overwrites** — Same operation on same branch overwrites previous log
-- **Persists** — Logs from deleted branches remain until manually cleared
-- **Shared** — All worktrees write to the same log directory
+All logs are stored in `.git/wt/logs/` (in the main worktree's git directory). All worktrees write to the same directory.
 
 ### Examples
 
@@ -962,7 +967,7 @@ $ tail -5 .git/wt/logs/commands.jsonl | jq .
 
 View a specific hook log:
 ```bash
-$ cat "$(git rev-parse --git-dir)/wt/logs/feature-project-post-start-build.log"
+$ cat "$(git rev-parse --git-dir)/wt/logs/feature-a1b-project-post-start-build-seq.log"
 ```
 
 Clear all logs:
@@ -973,13 +978,13 @@ $ wt config state logs clear
 ### Command reference
 
 ```
-wt config state logs - Background operation logs
+wt config state logs - Operation and debug logs
 
 Usage: wt config state logs [OPTIONS] [COMMAND]
 
 Commands:
   get    Get log file paths
-  clear  Clear background operation logs
+  clear  Clear all log files
 
 Options:
   -h, --help
