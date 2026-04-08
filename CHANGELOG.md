@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.35.2
+
+### Improved
+
+- **Multiple NAME filters for hook subcommands**: `wt hook pre-merge --yes insta doctest doc` runs a subset of hooks in one command, instead of chaining separate invocations. ([#2013](https://github.com/max-sixty/worktrunk/pull/2013))
+
+- **Branch context in batch removal hooks**: During prune or multi-remove, hook announcement messages now include the branch name (`Running post-remove for **branch-name**: project:cleanup`), disambiguating which worktree triggered each hook. ([#2014](https://github.com/max-sixty/worktrunk/pull/2014))
+
+### Fixed
+
+- **Bare repo false positive when `core.bare` is unset**: Repos cloned by Eclipse/EGit (and other tools that don't write `core.bare`) were incorrectly detected as bare. Replaced `git rev-parse --is-bare-repository` with `git config --type=bool core.bare`. Fixes [#1939](https://github.com/max-sixty/worktrunk/issues/1939). ([#1976](https://github.com/max-sixty/worktrunk/pull/1976), thanks @daniel-iwan-datacore for reporting)
+
 ## 0.35.1
 
 ### Fixed
