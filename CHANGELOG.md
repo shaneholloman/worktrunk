@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.35.3
+
+### Improved
+
+- **`wt step prune` streams removals inline**: Removals and "Skipped" messages now print as each integration check completes, overlapping with still-running checks — previously there was a visible gap of silence while all parallel checks finished before any output appeared. ([#2015](https://github.com/max-sixty/worktrunk/pull/2015))
+
+- **Fewer redundant `git worktree list` calls in prune and multi-remove**: `prepare_worktree_removal()` now accepts a pre-fetched worktree list, eliminating N+1 subprocess calls when removing many worktrees. ([#2025](https://github.com/max-sixty/worktrunk/pull/2025))
+
+### Fixed
+
+- **Picker preview UI lag**: The picker's preview cache now stores pager-rendered output, so cache hits skip the pager subprocess entirely. Previously, scrolling past an item with a large diff froze the UI briefly on every re-render because the pager ran on every call. ([#2021](https://github.com/max-sixty/worktrunk/pull/2021))
+
+- **Template error hint underlining**: The "Available variables" hint in template expansion errors now underlines each variable name individually instead of wrapping the entire comma-separated list in a single underline span. ([#2028](https://github.com/max-sixty/worktrunk/pull/2028))
+
+### Documentation
+
+- **Cross-linked vars references**: The vars feature is documented in the hook template variables table, `wt config state vars` page, and tips-patterns recipes — these now link to each other so readers can navigate between "how to set" and "how to use in templates". ([#2034](https://github.com/max-sixty/worktrunk/pull/2034))
+
+- **Clearer project config intro**: Improved the project config introduction and template variable heading in `wt config` help text. ([#2032](https://github.com/max-sixty/worktrunk/pull/2032))
+
 ## 0.35.2
 
 ### Improved
