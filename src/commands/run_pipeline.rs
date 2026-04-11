@@ -183,13 +183,20 @@ fn spawn_shell_command(
 /// Waits every spawned child before returning. If any failed, the first
 /// failure (in spawn order) is returned, matching the serial-step bail
 /// format. Per-command output already lives in each command's log file.
+///
+/// When `WORKTRUNK_TEST_SERIAL_CONCURRENT=1` is set, each command's child is
+/// awaited before the next is spawned so output ordering is deterministic for
+/// snapshot tests. The serial path bails on the first failure rather than
+/// running every child to completion (the test hatch is for ordering, not
+/// error semantics).
 fn run_concurrent_group(
     commands: &[super::pipeline_spec::PipelineCommandSpec],
     spec: &PipelineSpec,
     repo: &Repository,
     cmd_index: &mut usize,
 ) -> anyhow::Result<()> {
-    let mut children = Vec::with_capacity(commands.len());
+    let serial = super::force_serial_concurrent();
+    let mut children = Vec::with_capacity(if serial { 0 } else { commands.len() });
 
     for cmd in commands {
         let log_name = command_log_name(cmd.name.as_deref(), *cmd_index);
@@ -199,9 +206,23 @@ fn run_concurrent_group(
         let expanded = expand_shell_template(&cmd.template, &cmd_ctx, repo, label)?;
         let cmd_json =
             serde_json::to_string(&*cmd_ctx).context("failed to serialize step context")?;
-        let child = spawn_shell_command(&expanded, &spec.worktree_path, &cmd_json, log_file)?;
-        children.push((cmd.name.clone(), expanded, child));
+        let mut child = spawn_shell_command(&expanded, &spec.worktree_path, &cmd_json, log_file)?;
         *cmd_index += 1;
+
+        if serial {
+            let status = child
+                .wait()
+                .with_context(|| format!("failed to wait for: {expanded}"))?;
+            if !status.success() {
+                bail!(
+                    "command failed with {}: {}",
+                    format_exit(status.code()),
+                    cmd.name.as_deref().unwrap_or(&expanded),
+                );
+            }
+        } else {
+            children.push((cmd.name.clone(), expanded, child));
+        }
     }
 
     wait_first_error(children.into_iter().map(
