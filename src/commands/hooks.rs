@@ -14,7 +14,8 @@ use super::command_executor::{
     CommandContext, PreparedCommand, PreparedStep, prepare_commands, prepare_steps,
 };
 use crate::commands::process::{HookLog, spawn_detached_exec};
-use crate::output::execute_command_in_worktree;
+use crate::output::execute_shell_command;
+use worktrunk::shell_exec::DIRECTIVE_FILE_ENV_VAR;
 
 /// A prepared command with its source information.
 pub struct SourcedCommand {
@@ -506,7 +507,13 @@ pub fn run_hook_with_filter(
         return Ok(());
     }
 
-    // Track first failure's exit code for Warn strategy (to propagate after all commands run)
+    // Foreground hooks have the same trust profile as aliases — the hook body
+    // is already arbitrary shell. Pass the directive file through so inner `wt`
+    // invocations (e.g. `wt switch --create` in a pre-start hook) can write
+    // shell directives back to the parent shell.
+    let directive_file: Option<PathBuf> =
+        std::env::var_os(DIRECTIVE_FILE_ENV_VAR).map(PathBuf::from);
+
     for cmd in commands {
         cmd.announce()?;
 
@@ -520,11 +527,12 @@ pub fn run_hook_with_filter(
         };
 
         let log_label = format!("{} {}", cmd.hook_type, cmd.summary_name());
-        if let Err(err) = execute_command_in_worktree(
+        if let Err(err) = execute_shell_command(
             ctx.worktree_path,
             &expanded,
             Some(&cmd.prepared.context_json),
             Some(&log_label),
+            directive_file.as_deref(),
         ) {
             // Extract raw message and exit code from error
             let (err_msg, exit_code) = if let Some(wt_err) = err.downcast_ref::<WorktrunkError>() {

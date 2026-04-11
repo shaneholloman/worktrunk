@@ -1,12 +1,26 @@
-//! Alias command implementation
+//! Alias command implementation.
 //!
-//! Runs user-defined command aliases configured in `[aliases]` sections
-//! of user config or project config. Aliases are command templates that
-//! support the same template variables as hooks.
+//! Aliases are user-defined commands configured in `[aliases]` sections of user
+//! or project config. They share execution infrastructure with hooks:
+//! `execute_shell_command` (signal forwarding, ANSI reset, `Cmd` tracing),
+//! `CommandConfig` (pipeline steps), template expansion, and the approval system.
 //!
-//! Project-config aliases require command approval (same as project hooks).
-//! User-config aliases are trusted and skip approval. When an alias exists
-//! in both configs, both run — user first, then project (with approval).
+//! ## Execution model
+//!
+//! Aliases iterate `CommandConfig::steps()`, preserving pipeline structure:
+//! - `HookStep::Single` — serial execution, fail-fast
+//! - `HookStep::Concurrent` — commands spawn via `thread::scope`, all run to
+//!   completion, first error propagated
+//!
+//! In pipelines, templates referencing `vars.*` use lazy expansion — deferred
+//! until execution time so prior steps can set vars via git config.
+//!
+//! ## Trust model
+//!
+//! User-config aliases are trusted (skip approval). Project-config aliases
+//! require command approval. When both define the same alias, both run — user
+//! first, then project. The directive file is passed through to child processes
+//! (same trust profile as foreground hooks).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,7 +28,8 @@ use std::path::PathBuf;
 use anyhow::{Context, bail};
 use color_print::cformat;
 use worktrunk::config::{
-    CommandConfig, ProjectConfig, UserConfig, append_aliases, expand_template,
+    CommandConfig, HookStep, ProjectConfig, UserConfig, append_aliases, expand_template,
+    template_references_var,
 };
 use worktrunk::git::{Repository, WorktrunkError};
 use worktrunk::shell_exec::DIRECTIVE_FILE_ENV_VAR;
@@ -24,7 +39,7 @@ use worktrunk::styling::{
 
 use crate::commands::command_approval::approve_alias_commands;
 use crate::commands::command_executor::{CommandContext, build_hook_context};
-use crate::commands::for_each::{CommandError, run_command_streaming};
+use crate::output::execute_shell_command;
 
 /// Built-in `wt step` subcommand names. Aliases with these names are
 /// shadowed by the built-in and will never run.
@@ -254,11 +269,9 @@ pub fn step_alias(opts: AliasOptions) -> anyhow::Result<()> {
     let context_json = serde_json::to_string(&context_map)
         .expect("HashMap<String, String> serialization should never fail");
 
-    let commands: Vec<_> = cmd_config.commands().collect();
-
     if opts.dry_run {
-        let expanded: Vec<_> = commands
-            .iter()
+        let expanded: Vec<_> = cmd_config
+            .commands()
             .map(|cmd| expand_template(&cmd.template, &vars, true, &repo, &opts.name))
             .collect::<Result<_, _>>()?;
         eprintln!(
@@ -281,52 +294,86 @@ pub fn step_alias(opts: AliasOptions) -> anyhow::Result<()> {
         progress_message(cformat!("Running alias <bold>{}</>", opts.name))
     );
 
-    // Pass the parent shell's directive file through to the alias subprocess
-    // so inner `wt` invocations (e.g. `wt switch --create` inside an alias
-    // body) can write shell integration directives like `cd '/path'` that the
-    // parent shell wrapper will source after `wt` exits. Without this the
-    // inner `wt` would see a scrubbed env var, print the "shell integration
-    // not installed" hint, and drop the `cd`.
-    //
-    // This is a deliberate relaxation of the usual env scrub: aliases are
-    // explicit, named, user-authorised commands (user-config aliases are
-    // trusted; project-config aliases require approval), and an alias body is
-    // already arbitrary shell that can `cd`/`rm`/`exec` anything locally, so
-    // letting it ask the parent shell to `cd` is strictly less powerful than
-    // what the body can already do.
-    //
-    // TODO: unify hook and alias execution so both pass the directive file
-    // through. Hooks currently scrub it (see `process.rs` and the `None`
-    // branch in `for_each::run_command_streaming`), so an inner `wt switch`
-    // inside a hook body still drops its `cd`. Foreground `pre-*` hooks have
-    // the same trust profile as aliases and could pass through too;
-    // background `post-*` hooks outlive the parent shell, so any unification
-    // needs to keep scrubbing in the detached spawn paths.
+    // Pass the parent shell's directive file through so inner `wt` invocations
+    // (e.g. `wt switch --create`) can write shell directives that the parent
+    // shell wrapper will source after `wt` exits. The Cmd builder scrubs the
+    // env var by default; `.directive_file()` re-adds it for trusted contexts.
     let parent_directive_file: Option<PathBuf> =
         std::env::var_os(DIRECTIVE_FILE_ENV_VAR).map(PathBuf::from);
 
-    for cmd in commands {
-        let command = expand_template(&cmd.template, &vars, true, &repo, &opts.name)?;
-        match run_command_streaming(
-            &command,
-            &wt_path,
-            Some(&context_json),
-            parent_directive_file.as_deref(),
-        ) {
-            Ok(()) => {}
-            Err(CommandError::SpawnFailed(err)) => {
-                bail!("Failed to run alias '{}': {}", opts.name, err);
-            }
-            Err(CommandError::ExitCode(exit_code)) => {
-                return Err(WorktrunkError::AlreadyDisplayed {
-                    exit_code: exit_code.unwrap_or(1),
-                }
-                .into());
+    let exec = AliasExecCtx {
+        vars: &vars,
+        repo: &repo,
+        alias_name: &opts.name,
+        wt_path: &wt_path,
+        context_json: &context_json,
+        directive_file: parent_directive_file.as_deref(),
+        is_pipeline: cmd_config.is_pipeline(),
+    };
+
+    for step in cmd_config.steps() {
+        match step {
+            HookStep::Single(cmd) => exec.run(cmd)?,
+            HookStep::Concurrent(cmds) => {
+                std::thread::scope(|s| {
+                    let handles: Vec<_> =
+                        cmds.iter().map(|cmd| s.spawn(|| exec.run(cmd))).collect();
+                    for handle in handles {
+                        handle.join().expect("alias command thread panicked")?;
+                    }
+                    Ok::<(), anyhow::Error>(())
+                })?;
             }
         }
     }
 
     Ok(())
+}
+
+/// Shared state for executing alias commands within a pipeline.
+struct AliasExecCtx<'a> {
+    vars: &'a HashMap<&'a str, &'a str>,
+    repo: &'a Repository,
+    alias_name: &'a str,
+    wt_path: &'a std::path::Path,
+    context_json: &'a str,
+    directive_file: Option<&'a std::path::Path>,
+    is_pipeline: bool,
+}
+
+impl AliasExecCtx<'_> {
+    /// Expand and execute a single alias command.
+    ///
+    /// In pipelines, templates referencing `vars.*` are deferred to execution
+    /// time so that vars set by earlier steps are available.
+    fn run(&self, cmd: &worktrunk::config::Command) -> anyhow::Result<()> {
+        let command = if self.is_pipeline && template_references_var(&cmd.template, "vars") {
+            let fresh_context: HashMap<String, String> = serde_json::from_str(self.context_json)
+                .context("failed to deserialize context_json")?;
+            let fresh_vars: HashMap<&str, &str> = fresh_context
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            expand_template(&cmd.template, &fresh_vars, true, self.repo, self.alias_name)?
+        } else {
+            expand_template(&cmd.template, self.vars, true, self.repo, self.alias_name)?
+        };
+        if let Err(err) = execute_shell_command(
+            self.wt_path,
+            &command,
+            Some(self.context_json),
+            None,
+            self.directive_file,
+        ) {
+            if let Some(WorktrunkError::ChildProcessExited { code, .. }) =
+                err.downcast_ref::<WorktrunkError>()
+            {
+                return Err(WorktrunkError::AlreadyDisplayed { exit_code: *code }.into());
+            }
+            bail!("Failed to run alias '{}': {}", self.alias_name, err);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
