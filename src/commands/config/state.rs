@@ -20,14 +20,13 @@ use color_print::cformat;
 use path_slash::PathExt as _;
 use worktrunk::config::config_path;
 use worktrunk::git::Repository;
-use worktrunk::path::{format_path_for_display, sanitize_for_filename};
+use worktrunk::path::format_path_for_display;
 use worktrunk::styling::{
     eprintln, format_heading, format_with_gutter, info_message, println, success_message,
     warning_message,
 };
 
 use crate::cli::{OutputFormat, SwitchFormat};
-use crate::commands::process::HookLog;
 use worktrunk::utils::epoch_now;
 
 use super::super::list::ci_status::{CachedCiStatus, CiBranchName};
@@ -231,16 +230,49 @@ struct LogRow {
     path: String,
     size: u64,
     modified_at: Option<u64>,
+    /// Structured hook-output segments — present for entries under branch subtrees,
+    /// absent for shared top-level files (command log, diagnostic).
+    hook_structure: Option<HookStructure>,
+}
+
+/// Structured view of a hook-output log path. Values are the on-disk (sanitized)
+/// names, so filters like `select(.source == "user")` work without splitting
+/// the relative path on `/`.
+struct HookStructure {
+    /// First path segment — sanitized branch directory (may include a short
+    /// collision-avoidance hash).
+    branch: String,
+    /// `"user"`, `"project"`, or `"internal"`.
+    source: String,
+    /// Hook type (`post-start`, `post-switch`, …) for user/project hooks;
+    /// `None` for internal operations.
+    hook_type: Option<String>,
+    /// Sanitized hook name for user/project hooks; internal op name
+    /// (e.g., `"remove"`) for internal entries.
+    name: String,
 }
 
 impl LogRow {
     fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
+        let mut obj = serde_json::json!({
             "file": self.display_name,
             "path": self.path,
             "size": self.size,
             "modified_at": self.modified_at,
-        })
+        });
+        if let Some(s) = &self.hook_structure {
+            let map = obj.as_object_mut().expect("json! produced an object");
+            map.insert("branch".into(), s.branch.clone().into());
+            map.insert("source".into(), s.source.clone().into());
+            map.insert(
+                "hook_type".into(),
+                s.hook_type
+                    .clone()
+                    .map_or(serde_json::Value::Null, Into::into),
+            );
+            map.insert("name".into(), s.name.clone().into());
+        }
+        obj
     }
 }
 
@@ -259,6 +291,7 @@ fn top_level_log_row(entry: &std::fs::DirEntry) -> LogRow {
         path,
         size,
         modified_at,
+        hook_structure: None,
     }
 }
 
@@ -280,6 +313,37 @@ fn hook_output_log_row(log_dir: &Path, entry: &HookOutputEntry) -> LogRow {
         path,
         size,
         modified_at,
+        hook_structure: parse_hook_structure(&entry.relative_display),
+    }
+}
+
+/// Parse a hook-output relative path into its structured segments.
+///
+/// Expected layouts (enforced by the writers in `commands/process.rs`):
+/// - `{branch}/{source}/{hook_type}/{name}.log` — user/project hooks
+/// - `{branch}/internal/{op}.log` — internal operations
+///
+/// Unknown layouts (legacy flat logs, future shapes) return `None` so the
+/// entry still appears in the listing, just without structured filtering.
+fn parse_hook_structure(relative: &str) -> Option<HookStructure> {
+    let parts: Vec<&str> = relative.split('/').collect();
+    match parts.as_slice() {
+        [branch, "internal", op_log] => Some(HookStructure {
+            branch: (*branch).to_string(),
+            source: "internal".to_string(),
+            hook_type: None,
+            name: op_log.strip_suffix(".log").unwrap_or(op_log).to_string(),
+        }),
+        [branch, source, hook_type, name_log] => Some(HookStructure {
+            branch: (*branch).to_string(),
+            source: (*source).to_string(),
+            hook_type: Some((*hook_type).to_string()),
+            name: name_log
+                .strip_suffix(".log")
+                .unwrap_or(name_log)
+                .to_string(),
+        }),
+        _ => None,
     }
 }
 
@@ -430,117 +494,36 @@ pub(super) fn render_all_log_sections(out: &mut String, repo: &Repository) -> an
     Ok(())
 }
 
-// ==================== Logs Get Command ====================
+// ==================== Logs List Command ====================
 
-/// Handle the logs get command
+/// List all log files — command log, hook output, and diagnostics.
 ///
-/// When `hook` is None, lists all log files.
-/// When `hook` is Some, returns the path to the specific log file for that hook.
-///
-/// # Hook spec format
-///
-/// - `source:hook-type:name` for hook commands (e.g., `user:post-start:server`)
-/// - `internal:op` for internal operations (e.g., `internal:remove`)
-pub fn handle_logs_get(
-    hook: Option<String>,
-    branch: Option<String>,
-    format: SwitchFormat,
-) -> anyhow::Result<()> {
+/// JSON output emits three arrays keyed by category, each entry carrying
+/// `file`, `path`, `size`, and `modified_at`. Hook-output entries additionally
+/// expose `branch`, `source`, `hook_type`, and `name` so consumers can filter
+/// with `jq` rather than parsing the slash-delimited `file` path.
+pub fn handle_logs_list(format: SwitchFormat) -> anyhow::Result<()> {
     let repo = Repository::current()?;
 
-    match hook {
-        None if format == SwitchFormat::Json => {
-            let (command_log, hook_output, diagnostic) = partition_log_files_json(&repo)?;
-            let output = serde_json::json!({
-                "command_log": command_log,
-                "hook_output": hook_output,
-                "diagnostic": diagnostic,
-            });
-            println!("{}", serde_json::to_string_pretty(&output)?);
-        }
-        None => {
-            // No hook specified, show all log files
-            let mut out = String::new();
-            render_all_log_sections(&mut out, &repo)?;
-
-            // Display through pager; fall back to direct stdout if pager unavailable
-            if show_help_in_pager(&out, true).is_err() {
-                println!("{}", out);
-            }
-        }
-        Some(hook_spec) => {
-            // Get the branch name
-            let branch = match branch {
-                Some(b) => b,
-                None => repo.require_current_branch("get log for current branch")?,
-            };
-
-            let log_dir = repo.wt_logs_dir();
-
-            // Parse the hook spec using HookLog
-            let hook_log = HookLog::parse(&hook_spec).map_err(|e| anyhow::anyhow!("{}", e))?;
-
-            // Check log directory exists
-            if !log_dir.exists() {
-                anyhow::bail!(
-                    "No log directory exists. Run a background hook first to create logs."
-                );
-            }
-
-            // Get the expected log path
-            let log_path = hook_log.path(&log_dir, &branch);
-
-            if log_path.exists() {
-                // Use to_slash_lossy() so Windows paths use forward slashes, consistent
-                // with the relative paths in `logs list` output.
-                let path_str = log_path.to_slash_lossy().into_owned();
-                if format == SwitchFormat::Json {
-                    let output = serde_json::json!({ "path": path_str });
-                    println!("{}", serde_json::to_string_pretty(&output)?);
-                } else {
-                    // Output just the path to stdout for easy piping.
-                    println!("{}", path_str);
-                }
-                return Ok(());
-            }
-
-            // No match found — show the expected relative path and list any
-            // logs that do exist for this branch.
-            let expected_relative = log_path
-                .strip_prefix(&log_dir)
-                .unwrap_or(&log_path)
-                .to_slash_lossy()
-                .into_owned();
-            let branch_dir = log_dir.join(sanitize_for_filename(&branch));
-            let available: Vec<String> = if branch_dir.exists() {
-                // Walk only the branch subtree, not every branch.
-                let mut entries = Vec::new();
-                walk_branch_dir(&log_dir, &branch_dir, &mut entries)?;
-                entries.into_iter().map(|e| e.relative_display).collect()
-            } else {
-                Vec::new()
-            };
-
-            if available.is_empty() {
-                anyhow::bail!(cformat!(
-                    "No log files for branch <bold>{}</>. Run a background hook first.",
-                    branch
-                ));
-            } else {
-                let details = format!(
-                    "Expected: {}\nAvailable: {}",
-                    expected_relative,
-                    available.join(", ")
-                );
-                return Err(anyhow::anyhow!(details).context(cformat!(
-                    "No log file matches <bold>{}</> for branch <bold>{}</>",
-                    hook_log.to_spec(),
-                    branch
-                )));
-            }
-        }
+    if format == SwitchFormat::Json {
+        let (command_log, hook_output, diagnostic) = partition_log_files_json(&repo)?;
+        let output = serde_json::json!({
+            "command_log": command_log,
+            "hook_output": hook_output,
+            "diagnostic": diagnostic,
+        });
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(());
     }
 
+    let mut out = String::new();
+    render_all_log_sections(&mut out, &repo)?;
+
+    // Display through pager; fall back to direct stdout if pager unavailable
+    // (matches #2155 routing --help output to stdout).
+    if show_help_in_pager(&out, true).is_err() {
+        println!("{}", out);
+    }
     Ok(())
 }
 
