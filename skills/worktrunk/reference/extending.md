@@ -37,22 +37,25 @@ Hooks live in two places:
 - **User config** (`~/.config/worktrunk/config.toml`) — personal, applies everywhere, trusted
 - **Project config** (`.config/wt.toml`) — shared with the team, requires [approval](https://worktrunk.dev/hook/#wt-hook-approvals) on first run
 
-Three formats, from simplest to most expressive:
+Three formats, from simplest to most expressive.
+
+A single command as a string:
 
 ```toml
-# Single command
 pre-start = "npm ci"
 ```
 
+A named table runs commands concurrently for `post-*` hooks and serially for `pre-*`:
+
 ```toml
-# Named commands (concurrent for post-*, serial for pre-*)
 [post-start]
 server = "npm start"
 watcher = "npm run watch"
 ```
 
+An array of tables is a pipeline — blocks run in order, commands within a block run concurrently:
+
 ```toml
-# Pipeline: blocks run in order, commands within a block run concurrently
 [[post-start]]
 install = "npm ci"
 
@@ -158,8 +161,6 @@ Because an inner `wt switch --create` inside an alias [propagates its `cd` to th
 
 ```toml
 [aliases]
-# Tail the current worktree's post-start hook named {{ name }} (handles sanitization):
-#   wt step hook-log --name=feature/auth
 hook-log = '''
 tail -f "$(wt config state logs --format=json | jq -r --arg name "{{ name | sanitize_hash }}" '
   .hook_output[]
@@ -169,7 +170,7 @@ tail -f "$(wt config state logs --format=json | jq -r --arg name "{{ name | sani
 '''
 ```
 
-The `sanitize_hash` filter produces a filesystem-safe name with a hash suffix that keeps distinct originals unique — the same transformation Worktrunk applies on disk — so the alias resolves the right log even for branch and hook names containing characters like `/`.
+Run with `wt step hook-log --name=<hook-name>` (e.g., `wt step hook-log --name=server`) to tail the current worktree's `post-start` hook of that name. The `sanitize_hash` filter produces a filesystem-safe name with a hash suffix that keeps distinct originals unique — the same transformation Worktrunk applies on disk — so the alias resolves the right log even for branch and hook names containing characters like `/`.
 
 See [`wt step` — Aliases](https://worktrunk.dev/step/#aliases) for the full reference.
 
