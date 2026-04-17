@@ -260,22 +260,7 @@ fn resolve_same_repo_ref(
     repo: &Repository,
     info: &RemoteRefInfo,
 ) -> anyhow::Result<ResolvedTarget> {
-    // Find the remote for the same-repo PR/MR and fetch the branch with an
-    // explicit refspec. This ensures the remote tracking branch is created even
-    // in repos with limited fetch refspecs (single-branch clones, bare repos).
-    let remote = remote_ref::find_remote(repo, info)?;
-
-    let branch = &info.source_branch;
-    eprintln!(
-        "{}",
-        progress_message(cformat!("Fetching <bold>{branch}</> from {remote}..."))
-    );
-    // Explicit refspec creates/updates the remote-tracking ref even when it's outside
-    // the configured fetch refspec (e.g., single-branch clones, bare repos).
-    let refspec = format!("+refs/heads/{branch}:refs/remotes/{remote}/{branch}");
-    // Use -- to prevent branch names starting with - from being interpreted as flags
-    repo.run_command(&["fetch", "--", &remote, &refspec])
-        .with_context(|| cformat!("Failed to fetch branch <bold>{}</> from {}", branch, remote))?;
+    fetch_same_repo_branch(repo, info)?;
 
     Ok(ResolvedTarget {
         branch: info.source_branch.clone(),
@@ -284,6 +269,79 @@ fn resolve_same_repo_ref(
             base_branch: None,
         },
     })
+}
+
+/// Fetch a same-repo PR/MR's source branch with an explicit refspec so the
+/// remote-tracking ref exists locally even in repos with limited fetch
+/// refspecs (single-branch clones, bare repos).
+fn fetch_same_repo_branch(repo: &Repository, info: &RemoteRefInfo) -> anyhow::Result<()> {
+    let remote = remote_ref::find_remote(repo, info)?;
+    let branch = &info.source_branch;
+    eprintln!(
+        "{}",
+        progress_message(cformat!("Fetching <bold>{branch}</> from {remote}..."))
+    );
+    let refspec = format!("+refs/heads/{branch}:refs/remotes/{remote}/{branch}");
+    // Use -- to prevent branch names starting with - from being interpreted as flags
+    repo.run_command(&["fetch", "--", &remote, &refspec])
+        .with_context(|| cformat!("Failed to fetch branch <bold>{}</> from {}", branch, remote))?;
+    Ok(())
+}
+
+/// Resolve a `--base` value, expanding `pr:`/`mr:` shortcuts. Non-shortcut
+/// inputs go through [`Repository::resolve_worktree_name`] (handles `@`/`-`/`^`).
+fn resolve_base_ref(repo: &Repository, base: &str) -> anyhow::Result<String> {
+    if let Some(suffix) = base.strip_prefix("pr:")
+        && let Ok(number) = suffix.parse::<u32>()
+    {
+        return resolve_remote_ref_as_base(repo, &GitHubProvider, number);
+    }
+
+    if let Some(suffix) = base.strip_prefix("mr:")
+        && let Ok(number) = suffix.parse::<u32>()
+    {
+        return resolve_remote_ref_as_base(repo, &GitLabProvider, number);
+    }
+
+    repo.resolve_worktree_name(base)
+}
+
+/// Resolve `pr:{N}` / `mr:{N}` for `--base`. Same-repo returns the source
+/// branch name; fork returns the PR head SHA so we don't create a tracking
+/// branch for a ref the user hasn't asked to check out.
+fn resolve_remote_ref_as_base(
+    repo: &Repository,
+    provider: &dyn RemoteRefProvider,
+    number: u32,
+) -> anyhow::Result<String> {
+    let ref_type = provider.ref_type();
+    let symbol = ref_type.symbol();
+
+    eprintln!(
+        "{}",
+        progress_message(cformat!(
+            "Fetching base {} {symbol}{number}...",
+            ref_type.name()
+        ))
+    );
+
+    let info = provider.fetch_info(number, repo)?;
+    eprintln!("{}", format_with_gutter(&format_ref_context(&info), None));
+
+    if !info.is_cross_repo {
+        fetch_same_repo_branch(repo, &info)?;
+        return Ok(info.source_branch.clone());
+    }
+
+    let remote = remote_ref::find_remote(repo, &info)?;
+    let display = ref_type.display(number);
+    repo.run_command(&["fetch", "--", &remote, &provider.tracking_ref(number)])
+        .with_context(|| cformat!("Failed to fetch <bold>{display}</> from {remote}"))?;
+    Ok(repo
+        .run_command(&["rev-parse", "FETCH_HEAD"])
+        .context("Failed to resolve FETCH_HEAD to a commit SHA")?
+        .trim()
+        .to_string())
 }
 
 /// Resolve the switch target, handling pr:/mr: syntax and --create/--base flags.
@@ -330,7 +388,7 @@ fn resolve_switch_target(
             );
             None
         } else {
-            let resolved = repo.resolve_worktree_name(base_str)?;
+            let resolved = resolve_base_ref(repo, base_str)?;
             if !repo.ref_exists(&resolved)? {
                 return Err(GitError::ReferenceNotFound {
                     reference: resolved,
