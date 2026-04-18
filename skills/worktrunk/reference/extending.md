@@ -119,6 +119,23 @@ wt deploy --env=staging
 
 Hyphens in variable names are canonicalized to underscores at parse time, so `--my-var=value` is referenced as `{{ my_var }}` in templates. This lets flags use natural kebab-case while avoiding the minijinja parser's interpretation of `{{ my-var }}` as subtraction.
 
+### Forwarding positional arguments
+
+Non-flag tokens after the alias name are forwarded to the template as `{{ args }}`. Bare `{{ args }}` renders as a space-joined, shell-escaped string ready to append to a command line — so `wt s some-branch` with `s = "wt switch {{ args }}"` expands to `wt switch some-branch`.
+
+```toml
+[aliases]
+s = "wt switch {{ args }}"
+```
+
+```bash
+wt s some-branch
+wt s feature/api  # multiple tokens pass through in order
+wt s 'has a space'  # spaces and metacharacters are escaped safely
+```
+
+Access elements with `{{ args[0] }}`, iterate with `{% for a in args %}…{% endfor %}`, or count with `{{ args | length }}`. Each element is individually shell-escaped, so `wt run 'a b' 'c;d'` splices in as `'a b' 'c;d'` without shell injection.
+
 An `up` alias that fetches all remotes and rebases each worktree onto its upstream:
 
 ```toml
