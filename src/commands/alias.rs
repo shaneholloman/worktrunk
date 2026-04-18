@@ -30,25 +30,25 @@
 //! the EXEC directive file is scrubbed so alias bodies cannot inject
 //! arbitrary shell into the interactive session.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, bail};
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 use color_print::cformat;
 use worktrunk::config::{
     ALIAS_ARGS_KEY, CommandConfig, HookStep, ProjectConfig, UserConfig, append_aliases,
-    referenced_vars_for_config, template_references_var, validate_template_syntax,
+    referenced_vars_for_config,
 };
 use worktrunk::git::Repository;
-use worktrunk::styling::{eprintln, format_bash_with_gutter, info_message, progress_message};
+use worktrunk::styling::{eprintln, progress_message};
 
 use crate::commands::command_approval::approve_alias_commands;
 use crate::commands::command_executor::{
     CommandContext, CommandOrigin, FailureStrategy, ForegroundStep, PreparedCommand, PreparedStep,
-    build_hook_context, execute_pipeline_foreground, expand_shell_template,
+    build_hook_context, execute_pipeline_foreground,
 };
 use crate::commands::did_you_mean;
-use crate::commands::hooks::format_pipeline_summary_from_names;
+use crate::commands::hooks::{format_pipeline_summary_from_names, step_names_from_config};
 use crate::output::DirectivePassthrough;
 
 /// Built-in `wt step` subcommand names. Aliases with these names are
@@ -80,11 +80,10 @@ const TOP_LEVEL_BUILTINS: &[&str] = &[
 #[derive(Debug)]
 pub struct AliasOptions {
     pub name: String,
-    pub dry_run: bool,
     pub vars: Vec<(String, String)>,
     /// Non-flag positional tokens passed after the alias name. Forwarded into
     /// the template context as `{{ args }}` (a `ShellArgs` sequence). Appear
-    /// in CLI order, interleaving freely with flags: `wt s foo --dry-run bar`
+    /// in CLI order, interleaving freely with flags: `wt s foo --env=prod bar`
     /// collects `["foo", "bar"]`.
     pub positional_args: Vec<String>,
 }
@@ -99,7 +98,6 @@ impl AliasOptions {
     ///
     /// - `--` — literal-forward escape: every later token goes straight into
     ///   `positional_args`, no var binding.
-    /// - `--dry-run` — sets `dry_run`.
     /// - `--KEY=VALUE` — binds `KEY=VALUE` if `KEY` is in `referenced_vars`,
     ///   otherwise forwards the whole `--KEY=VALUE` token as a positional.
     /// - `--KEY VALUE` (separated by space, `VALUE` doesn't start with `--`)
@@ -117,6 +115,12 @@ impl AliasOptions {
     /// propagate across `external_subcommand`, so the post-alias form
     /// never reaches the global parser anyway.
     ///
+    /// `--dry-run` is no longer recognized — use `wt config alias dry-run <name>`
+    /// instead. The parser raises an actionable error pointing at the new
+    /// subcommand rather than silently forwarding the flag into `{{ args }}`.
+    /// The bail fires only outside `literal_mode`, so `wt alias -- --dry-run`
+    /// still forwards `--dry-run` as a positional.
+    ///
     /// Hyphens in variable names are canonicalized to underscores before
     /// lookup and storage (minijinja parses `{{ my-var }}` as subtraction),
     /// so `--my-var=value` binds to `{{ my_var }}` when the template
@@ -130,7 +134,6 @@ impl AliasOptions {
             bail!("Missing alias name");
         };
 
-        let mut dry_run = false;
         let mut vars = Vec::new();
         let mut positional_args = Vec::new();
         let mut literal_mode = false;
@@ -148,9 +151,9 @@ impl AliasOptions {
                 continue;
             }
             if arg == "--dry-run" {
-                dry_run = true;
-                i += 1;
-                continue;
+                bail!(
+                    "--dry-run is no longer supported; use `wt config alias dry-run {name}` instead"
+                );
             }
             if let Some(rest) = arg.strip_prefix("--") {
                 if let Some((key, value)) = rest.split_once('=') {
@@ -187,7 +190,6 @@ impl AliasOptions {
 
         Ok(Self {
             name,
-            dry_run,
             vars,
             positional_args,
         })
@@ -263,15 +265,7 @@ fn unknown_step_command_exit(name: &str, alias_names: &[&str]) -> ! {
 /// non-pipeline `Running {type} {name}` form for hooks. Both apply bold
 /// styling to the alias/command name — keep them in sync if styling evolves.
 fn format_alias_announcement(name: &str, cmd_config: &CommandConfig) -> String {
-    let step_names: Vec<Vec<Option<&str>>> = cmd_config
-        .steps()
-        .iter()
-        .map(|step| match step {
-            HookStep::Single(cmd) => vec![cmd.name.as_deref()],
-            HookStep::Concurrent(cmds) => cmds.iter().map(|c| c.name.as_deref()).collect(),
-        })
-        .collect();
-
+    let step_names = step_names_from_config(cmd_config);
     let summary =
         format_pipeline_summary_from_names(&step_names, |n| cformat!("<bold>{n}</>"), |_| None);
 
@@ -404,19 +398,16 @@ fn run_alias(
         .get(&opts.name)
         .expect("caller verified alias is configured");
 
-    let skip_approval = global_yes;
-
-    // Check if this alias needs project-config approval (skip for --dry-run).
-    // project_id is required for approval — re-derive with error propagation
-    // rather than relying on `.ok()`.
-    if !opts.dry_run
-        && let Some(project_commands) = alias_needs_approval(&opts.name, &project_config)
-    {
+    // Check if this alias needs project-config approval. project_id is required
+    // for approval — re-derive with error propagation rather than relying on
+    // `.ok()`. `global_yes` is the sole source for skipping approval now that
+    // `wt <alias> --yes` (post-alias form) is unsupported.
+    if let Some(project_commands) = alias_needs_approval(&opts.name, &project_config) {
         let project_id = repo
             .project_identifier()
             .context("Cannot determine project identifier for alias approval")?;
         let approved =
-            approve_alias_commands(&project_commands, &opts.name, &project_id, skip_approval)?;
+            approve_alias_commands(&project_commands, &opts.name, &project_id, global_yes)?;
         if !approved {
             return Ok(());
         }
@@ -446,26 +437,6 @@ fn run_alias(
     // Build JSON context for stdin
     let context_json = serde_json::to_string(&context_map)
         .expect("HashMap<String, String> serialization should never fail");
-
-    if opts.dry_run {
-        let expanded: Vec<_> = cmd_config
-            .commands()
-            .map(|cmd| render_for_dry_run(&cmd.template, &context_map, &repo, &opts.name))
-            .collect::<anyhow::Result<_>>()?;
-        eprintln!(
-            "{}",
-            info_message(cformat!(
-                "Alias <bold>{}</> would run:\n{}",
-                opts.name,
-                expanded
-                    .iter()
-                    .map(|c| format_bash_with_gutter(c))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ))
-        );
-        return Ok(());
-    }
 
     eprintln!(
         "{}",
@@ -512,30 +483,6 @@ fn run_alias(
     )
 }
 
-/// Render a command template for `--dry-run` display.
-///
-/// Mirrors execution-time lazy semantics: templates referencing `vars.*` may
-/// read values set by earlier pipeline steps via git config, and at dry-run
-/// time those values haven't been written yet (even if git config happens to
-/// hold a stale value from a previous run, the execution path would overwrite
-/// it). For those templates, syntax-validate (catching typos like
-/// `{{ vars..foo }}`) and show the raw template. Other templates expand
-/// eagerly against the initial context just like before.
-fn render_for_dry_run(
-    template: &str,
-    context: &HashMap<String, String>,
-    repo: &Repository,
-    alias_name: &str,
-) -> anyhow::Result<String> {
-    if template_references_var(template, "vars") {
-        validate_template_syntax(template, alias_name)
-            .map_err(|e| anyhow::anyhow!("syntax error in alias {alias_name}: {e}"))?;
-        Ok(template.to_string())
-    } else {
-        Ok(expand_shell_template(template, context, repo, alias_name)?)
-    }
-}
-
 /// Build a PreparedCommand for an alias, deferring template expansion to execution time.
 fn alias_prepared_command(cmd: &worktrunk::config::Command, context_json: &str) -> PreparedCommand {
     PreparedCommand {
@@ -550,9 +497,18 @@ fn alias_prepared_command(cmd: &worktrunk::config::Command, context_json: &str) 
 /// the listing shows both entries in runtime order (user first, then project)
 /// rather than merging them, so users see the real commands from each source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum AliasSource {
+pub(crate) enum AliasSource {
     User,
     Project,
+}
+
+impl AliasSource {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            AliasSource::User => "user",
+            AliasSource::Project => "project",
+        }
+    }
 }
 
 /// Which help page is being augmented. Controls the "shadowed by built-in"
@@ -740,14 +696,7 @@ fn format_alias_summary(cfg: &CommandConfig) -> String {
     // fall into the else branch and hide all but the first command. Count
     // actual commands instead.
     if cfg.commands().count() > 1 {
-        let step_names: Vec<Vec<Option<&str>>> = cfg
-            .steps()
-            .iter()
-            .map(|step| match step {
-                HookStep::Single(cmd) => vec![cmd.name.as_deref()],
-                HookStep::Concurrent(cmds) => cmds.iter().map(|c| c.name.as_deref()).collect(),
-            })
-            .collect();
+        let step_names = step_names_from_config(cfg);
         let summary = format_pipeline_summary_from_names(&step_names, |n| n.to_string(), |_| None);
         if summary.is_empty() {
             format!("<{} steps>", cfg.commands().count())
@@ -864,16 +813,6 @@ cmd = [
         assert_debug_snapshot!(parse(&["deploy"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
-            vars: [],
-            positional_args: [],
-        }
-        "#);
-        // --dry-run is recognized regardless of referenced_vars.
-        assert_debug_snapshot!(parse(&["deploy", "--dry-run"]).unwrap(), @r#"
-        AliasOptions {
-            name: "deploy",
-            dry_run: true,
             vars: [],
             positional_args: [],
         }
@@ -887,7 +826,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env=staging"], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "env",
@@ -901,7 +839,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env=staging"], &[]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--env=staging",
@@ -912,7 +849,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--url=http://host?a=1"], &["url"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "url",
@@ -926,7 +862,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env="], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "env",
@@ -940,7 +875,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env="], &[]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--env=",
@@ -956,7 +890,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env", "staging"], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "env",
@@ -970,7 +903,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env", "staging"], &[]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--env",
@@ -983,7 +915,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env", "--other"], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--env",
@@ -995,7 +926,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env"], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--env",
@@ -1012,7 +942,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--my-var=value"], &["my_var"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "my_var",
@@ -1026,7 +955,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--my_var=value"], &["my_var"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "my_var",
@@ -1040,7 +968,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--region=us-east-1"], &["region"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "region",
@@ -1060,7 +987,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--env=staging", "--", "--env=other", "x"], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "env",
@@ -1078,7 +1004,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--", "--yes", "-y", "--dry-run"], &[]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--yes",
@@ -1091,7 +1016,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--"], &[]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [],
         }
@@ -1101,7 +1025,6 @@ cmd = [
         assert_debug_snapshot!(parse_with(&["deploy", "--", "a", "--", "b"], &[]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "a",
@@ -1125,7 +1048,6 @@ cmd = [
             @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [
                 (
                     "env",
@@ -1151,7 +1073,6 @@ cmd = [
         assert_debug_snapshot!(parse(&["s", "some-branch"]).unwrap(), @r#"
         AliasOptions {
             name: "s",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "some-branch",
@@ -1162,7 +1083,6 @@ cmd = [
         assert_debug_snapshot!(parse(&["deploy", "one", "two", "three"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "one",
@@ -1171,12 +1091,16 @@ cmd = [
             ],
         }
         "#);
-        // Built-in flags can interleave with positionals.
-        assert_debug_snapshot!(parse(&["deploy", "foo", "--dry-run", "bar"]).unwrap(), @r#"
+        // Positionals can interleave with flags; flags bind when referenced, positionals keep order.
+        assert_debug_snapshot!(parse_with(&["deploy", "foo", "--env=prod", "bar"], &["env"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: true,
-            vars: [],
+            vars: [
+                (
+                    "env",
+                    "prod",
+                ),
+            ],
             positional_args: [
                 "foo",
                 "bar",
@@ -1188,7 +1112,6 @@ cmd = [
         assert_debug_snapshot!(parse(&["deploy", "foo bar", "x;rm -rf /"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "foo bar",
@@ -1206,7 +1129,6 @@ cmd = [
         assert_debug_snapshot!(parse(&["deploy", "--yes"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "--yes",
@@ -1216,7 +1138,6 @@ cmd = [
         assert_debug_snapshot!(parse(&["deploy", "-y"]).unwrap(), @r#"
         AliasOptions {
             name: "deploy",
-            dry_run: false,
             vars: [],
             positional_args: [
                 "-y",
@@ -1231,6 +1152,8 @@ cmd = [
         assert_snapshot!(parse(&[]).unwrap_err(), @"Missing alias name");
         // `--=value` has an empty key — caught even when bind would forward.
         assert_snapshot!(parse(&["deploy", "--=value"]).unwrap_err(), @"invalid KEY=VALUE: key cannot be empty");
+        // Retired `--dry-run` flag gives an actionable error pointing at the new subcommand.
+        assert_snapshot!(parse(&["deploy", "--dry-run"]).unwrap_err(), @"--dry-run is no longer supported; use `wt config alias dry-run deploy` instead");
     }
 
     /// `referenced_vars_for_config` unions across pipeline steps so a var
