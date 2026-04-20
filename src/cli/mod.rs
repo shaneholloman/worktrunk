@@ -1459,16 +1459,6 @@ Git worktrees share the repository but not untracked files. [`wt step copy-ignor
 copy = "wt step copy-ignored"
 ```
 
-Use `pre-start` instead if subsequent hooks need the copied files — for example, copying `node_modules/` before `pnpm install` so the install reuses cached packages:
-
-```toml
-[[pre-start]]
-copy = "wt step copy-ignored"
-
-[[pre-start]]
-install = "pnpm install"
-```
-
 ## Progressive validation
 
 Quick checks before commit, thorough validation before merge:
@@ -1497,62 +1487,9 @@ fi
 """
 ```
 
-## Python virtual environments
-
-Use `uv sync` to recreate virtual environments, or `python -m venv .venv && .venv/bin/pip install -r requirements.txt` for pip-based projects:
-
-```toml
-[pre-start]
-install = "uv sync"
-```
-
-For copying dependencies and caches between worktrees, see [`wt step copy-ignored`](@/step.md#language-specific-notes).
-
-## Hook type examples
-
-```toml
-post-merge = "cargo install --path ."
-
-[[pre-start]]
-install = "npm ci"
-env = "echo 'PORT={{ branch | hash_port }}' > .env.local"
-
-[[pre-commit]]
-format = "cargo fmt -- --check"
-lint = "cargo clippy -- -D warnings"
-
-[[pre-merge]]
-test = "cargo test"
-build = "cargo build --release"
-
-[pre-switch]
-pull = """
-FETCH_HEAD="$(git rev-parse --git-common-dir)/FETCH_HEAD"
-if [ "$(find "$FETCH_HEAD" -mmin +360 2>/dev/null)" ] || [ ! -f "$FETCH_HEAD" ]; then
-    git pull
-fi
-"""
-
-[post-switch]
-tmux = "[ -n \"$TMUX\" ] && tmux rename-window {{ branch | sanitize }}"
-
-[post-start]
-copy = "wt step copy-ignored"
-server = "npm run dev -- --port {{ branch | hash_port }}"
-
-[post-commit]
-notify = "curl -s https://ci.example.com/trigger?branch={{ branch }}"
-
-[pre-remove]
-archive = "tar -czf ~/.wt-logs/{{ branch }}.tar.gz test-results/ logs/ 2>/dev/null || true"
-
-[post-remove]
-kill-server = "lsof -ti :{{ branch | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
-remove-db = "docker stop {{ repo }}-{{ branch | sanitize }}-postgres 2>/dev/null || true"
-```
-
 ## More recipes
 
+- Copy gitignored files between worktrees: `wt step copy-ignored` in `post-start` shares build caches and dependencies; use a `[[post-start]]` pipeline when a later hook depends on the copy — https://worktrunk.dev/tips-patterns/#eliminate-cold-starts
 - Dev server per worktree: `hash_port` in `post-start` for launch and `post-remove` for cleanup, with optional subdomain routing — https://worktrunk.dev/tips-patterns/#dev-server-per-worktree
 - Database per worktree: a `post-start` pipeline stores container name, port, and connection string as [per-branch vars](@/config.md#wt-config-state-vars) that later hooks reference — https://worktrunk.dev/tips-patterns/#database-per-worktree
 

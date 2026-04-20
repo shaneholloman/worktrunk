@@ -120,21 +120,19 @@ Use [`wt step copy-ignored`](@/step.md#wt-step-copy-ignored) to copy gitignored 
 copy = "wt step copy-ignored"
 ```
 
-Use `pre-start` instead if subsequent hooks or `--execute` command need the copied files immediately.
-
-All gitignored files are copied by default. To limit what gets copied, create `.worktreeinclude` with patterns — files must be both gitignored and listed. See [`wt step copy-ignored`](@/step.md#wt-step-copy-ignored) for details.
-
-## Local CI gate
-
-`pre-merge` hooks run before merging. Failures abort the merge:
+When another hook depends on the copy — for example, copying `node_modules/` before `pnpm install` so the install reuses cached packages — sequence them with a `[[post-start]]` pipeline:
 
 ```toml
-[[pre-merge]]
-lint = "uv run ruff check"
-test = "uv run pytest"
+[[post-start]]
+copy = "wt step copy-ignored"
+
+[[post-start]]
+install = "pnpm install"
 ```
 
-This catches issues locally before pushing — like running CI locally.
+Use `pre-start` instead when an `--execute` command needs the copied files immediately.
+
+All gitignored files are copied by default. To limit what gets copied, create `.worktreeinclude` with patterns — files must be both gitignored and listed. See [`wt step copy-ignored`](@/step.md#wt-step-copy-ignored) for details.
 
 ## Manual commit messages
 
