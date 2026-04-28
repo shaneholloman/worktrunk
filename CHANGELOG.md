@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.45.2
+
+### Fixed
+
+- **Interactive pickers via aliases no longer freeze with a blank screen**: After the v0.44.0 fix that let aliases inherit the controlling tty ([#2380](https://github.com/max-sixty/worktrunk/pull/2380)), `wt sw` (and other aliases that wrap `wt switch`) still hung — the alias child was placed in a new process group, so when the skim picker called `tcsetattr` on `/dev/tty` the kernel raised SIGTTOU and stopped it mid-render. The interactive (no-stdin-payload) execution path now keeps the alias child in wt's process group; a PID-targeted signal forwarder ensures externally-delivered signals (`kill -TERM <wt-pid>`) still reach the child. Hooks (which receive JSON on stdin) are unaffected. ([#2444](https://github.com/max-sixty/worktrunk/pull/2444))
+
+### Improved
+
+- **`wt <alias> --help` hint follows output guidelines**: The hint emitted on `wt <alias> --help` previously printed to stdout without a status symbol, used backticks around commands, and stacked three indented bullet suggestions. It now renders as an info line plus a single semicolon-joined hint on stderr, with commands styled via underline (dim-safe). ([#2447](https://github.com/max-sixty/worktrunk/pull/2447))
+
 ## 0.45.1
 
 ### Fixed
