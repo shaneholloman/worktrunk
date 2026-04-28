@@ -108,45 +108,6 @@ failure, not a broken link:
 When in doubt, post a comment on the failed run summarizing the diagnosis and
 wait — don't open a PR.
 
-## Polling `gh run rerun --failed`
-
-After `gh run rerun <run-id> --failed`, poll the rerun jobs directly — the
-parent run's `.status` stays `in_progress` until every sibling job finishes,
-including unrelated long-running ones.
-
-```bash
-gh run rerun <run-id> --failed --repo "$REPO"
-
-# New attempt records take a few seconds to surface; without this sleep,
-# the next query can see only the prior `failure` rows and exit immediately.
-sleep 10
-
-# `?filter=latest` returns each job's most recent attempt. Avoid `!=` in
-# --jq filters: the Bash tool rewrites `!` to `\!`, which jq rejects. Use
-# `== "completed" | not` instead.
-JOB_IDS=$(gh api "repos/$REPO/actions/runs/<run-id>/jobs?filter=latest" \
-  --jq '.jobs[] | select((.status == "completed") | not) | .id')
-
-# Rollup poll: one pass checks all reran jobs together and exits when the
-# last one is terminal.
-pending_jobs() {
-  local n=0
-  for id in $JOB_IDS; do
-    s=$(gh api "repos/$REPO/actions/jobs/$id" --jq '.status')
-    [ "$s" = "completed" ] || n=$((n + 1))
-  done
-  echo "$n"
-}
-for i in $(seq 1 15); do
-  [ "$(pending_jobs)" -eq 0 ] && break
-  sleep 60
-done
-```
-
-The bundled `running-in-ci` `pending()` recipe (statusCheckRollup) does not
-help — sibling check-runs on the head SHA still appear pending. Polling
-specific job IDs is the only fix.
-
 ## Applying GitHub Suggestions
 
 Apply the literal suggestion only — change the lines it covers, nothing more.
@@ -256,8 +217,8 @@ Triage each duplicate:
   `merge_base("main", "branch")` keying separately;
   `worktree_at(cwd)` vs `worktree_at(porcelain_path)` not canonicalizing.
 
-Baseline as of 2026-04-13: 29 git subprocesses per render on a clean tree
-(see PR #2209). A jump above ~32 on a clean tree warrants investigation.
+Baseline: ~29 git subprocesses per render on a clean tree; a jump above
+~32 warrants investigation.
 
 ## README Date Check
 
