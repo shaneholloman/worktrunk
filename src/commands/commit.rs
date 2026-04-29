@@ -8,7 +8,7 @@ use worktrunk::styling::{
 
 use super::command_executor::CommandContext;
 use super::command_executor::FailureStrategy;
-use super::hooks::{HookCommandSpec, spawn_background_hooks};
+use super::hooks::{execute_hook, spawn_background_hooks};
 use super::repository_ext::warn_about_untracked_files;
 
 // Re-export StageMode from config for use by CLI
@@ -177,20 +177,14 @@ impl CommitOptions<'_> {
                 .map(|target| ("target", target))
                 .collect();
 
-            // Run pre-commit hooks (user first, then project)
-            super::hooks::run_hook_with_filter(
+            // Run pre-commit hooks (user first, then project).
+            execute_hook(
                 self.ctx,
-                HookCommandSpec {
-                    user_config: user_cfg,
-                    project_config: proj_cfg,
-                    hook_type: HookType::PreCommit,
-                    extra_vars: &extra_vars,
-                    name_filters: &[],
-                    display_path: crate::output::pre_hook_display_path(self.ctx.worktree_path),
-                },
+                HookType::PreCommit,
+                &extra_vars,
                 FailureStrategy::FailFast,
-            )
-            .map_err(worktrunk::git::add_hook_skip_hint)?;
+                crate::output::pre_hook_display_path(self.ctx.worktree_path),
+            )?;
         }
 
         // Use the worktree path from context — this is the target worktree when
