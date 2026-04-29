@@ -10,6 +10,7 @@ use super::command_executor::CommandContext;
 use super::command_executor::FailureStrategy;
 use super::hooks::{execute_hook, spawn_background_hooks};
 use super::repository_ext::warn_about_untracked_files;
+use super::template_vars::TemplateVars;
 
 // Re-export StageMode from config for use by CLI
 pub use worktrunk::config::StageMode;
@@ -170,18 +171,16 @@ impl CommitOptions<'_> {
             eprintln!("{}", info_message("Skipping pre-commit hooks (--no-hooks)"));
         }
 
-        if self.verify {
-            let extra_vars: Vec<(&str, &str)> = self
-                .target_branch
-                .into_iter()
-                .map(|target| ("target", target))
-                .collect();
+        let template_vars = self
+            .target_branch
+            .map_or_else(TemplateVars::new, |t| TemplateVars::new().with_target(t));
 
+        if self.verify {
             // Run pre-commit hooks (user first, then project).
             execute_hook(
                 self.ctx,
                 HookType::PreCommit,
-                &extra_vars,
+                &template_vars.as_extra_vars(),
                 FailureStrategy::FailFast,
                 crate::output::pre_hook_display_path(self.ctx.worktree_path),
             )?;
@@ -225,11 +224,7 @@ impl CommitOptions<'_> {
 
         // Spawn post-commit hooks in background (respects --no-hooks)
         if self.verify {
-            let extra_vars: Vec<(&str, &str)> = self
-                .target_branch
-                .into_iter()
-                .map(|target| ("target", target))
-                .collect();
+            let extra_vars = template_vars.as_extra_vars();
             spawn_background_hooks(self.ctx, HookType::PostCommit, &extra_vars, None)?;
         }
 
