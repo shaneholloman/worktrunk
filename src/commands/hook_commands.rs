@@ -98,7 +98,7 @@ fn run_post_hook(
         if flat.is_empty() {
             return Ok(());
         }
-        announcer.extend(std::iter::once((*ctx, flat)));
+        announcer.extend(std::iter::once((*ctx, hook_type, None, flat)));
     }
     announcer.flush()
 }
