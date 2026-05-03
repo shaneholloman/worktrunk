@@ -727,14 +727,13 @@ pub fn handle_picker(
         } else {
             Repository::current().context("Failed to switch worktree")?
         };
-        // Load config, offering bare repo worktree-path fix if needed.
-        // Reload from disk so mutations are picked up by plan_switch.
-        // Warm project_config alongside — `run_pre_switch_hooks` /
-        // `plan_switch` consume it via `repo.load_project_config()` (cache
-        // hit). User config is what we read here; project sits in the cache.
+        // Warm both configs in parallel; project sits in the cache for
+        // downstream `run_pre_switch_hooks` / `plan_switch`. Clone user out
+        // so `offer_bare_repo_worktree_path_fix` can mutate locally.
         let mut config = worktrunk::config::LoadedConfigs::load(&repo)
             .context("Failed to load config")?
-            .user;
+            .user
+            .clone();
         offer_bare_repo_worktree_path_fix(&repo, &mut config)?;
 
         // Run pre-switch hooks before branch resolution or worktree creation.
