@@ -792,7 +792,14 @@ fn render_shell_status(out: &mut String) -> anyhow::Result<()> {
         }
         writeln!(out, "{}", format_with_gutter(&debug_lines.join("\n"), None))?;
     }
-    writeln!(out)?;
+
+    // Blank line separates the active/not-active status from the per-shell list.
+    // Only emit when there's a list to render — otherwise the trailing hint
+    // ("To configure, run …") would float behind a stray blank, breaking the
+    // hint-attaches-to-subject formatting rule.
+    if !scan_result.configured.is_empty() || !scan_result.skipped.is_empty() {
+        writeln!(out)?;
+    }
 
     let mut any_not_configured = false;
     let mut has_any_unmatched = false;
