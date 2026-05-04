@@ -1547,7 +1547,7 @@ pub fn step_prune(
 
     // Capture once at command entry. Reused for every per-branch
     // `integration_reason` probe later in this function.
-    let snapshot = repo.capture_refs()?;
+    let snapshot = repo.capture_refs().context("capturing repository refs")?;
 
     // Pass the local default branch (e.g. "main") directly — `integration_reason`
     // ORs over local + upstream internally, so a branch merged into either side
@@ -1556,8 +1556,12 @@ pub fn step_prune(
         .default_branch()
         .context("cannot determine default branch")?;
 
-    let worktrees = repo.list_worktrees()?;
-    let current_root = repo.current_worktree().root()?.to_path_buf();
+    let worktrees = repo.list_worktrees().context("listing worktrees")?;
+    let current_root = repo
+        .current_worktree()
+        .root()
+        .context("resolving current worktree root")?
+        .to_path_buf();
     let current_root = dunce::canonicalize(&current_root).unwrap_or(current_root);
     let now_secs = worktrunk::utils::epoch_now();
 
@@ -1760,7 +1764,10 @@ pub fn step_prune(
         // Skip main worktree (non-linked); in bare repos all are linked,
         // so the default-branch check above is the primary guard.
         let wt_tree = repo.worktree_at(&wt.path);
-        if !wt_tree.is_linked()? {
+        if !wt_tree
+            .is_linked()
+            .context("checking whether worktree is linked")?
+        {
             continue;
         }
 
@@ -1775,7 +1782,7 @@ pub fn step_prune(
         });
     }
 
-    for branch in repo.all_branches()? {
+    for branch in repo.all_branches().context("listing branches")? {
         if seen_branches.contains(&branch) {
             continue;
         }
@@ -1833,7 +1840,7 @@ pub fn step_prune(
 
     // Process results as they arrive from the channel.
     for (idx, result) in rx {
-        let (effective_target, reason) = result?;
+        let (effective_target, reason) = result.context("checking branch integration")?;
         let Some(reason) = reason else {
             continue;
         };
@@ -1853,7 +1860,7 @@ pub fn step_prune(
             // they were just created from the default branch
             if min_age_duration > Duration::ZERO {
                 let wt_tree = repo.worktree_at(&wt.path);
-                let git_dir = wt_tree.git_dir()?;
+                let git_dir = wt_tree.git_dir().context("resolving worktree git dir")?;
                 let metadata = fs::metadata(&git_dir).context("Failed to read worktree git dir")?;
                 let created = metadata.created().or_else(|_| {
                     fs::metadata(git_dir.join("commondir")).and_then(|m| m.modified())
@@ -1905,7 +1912,9 @@ pub fn step_prune(
                 run_hooks,
                 worktrees,
                 &snapshot_arc,
-            )? {
+            )
+            .with_context(|| format!("removing worktree for {}", candidate.label))?
+            {
                 removed.push(candidate);
             }
             continue;
@@ -1964,7 +1973,9 @@ pub fn step_prune(
             run_hooks,
             worktrees,
             &snapshot_arc,
-        )? {
+        )
+        .with_context(|| format!("removing worktree for {}", candidate.label))?
+        {
             removed.push(candidate);
         }
     }
@@ -2043,7 +2054,8 @@ pub fn step_prune(
             run_hooks,
             worktrees,
             &snapshot_arc,
-        )?
+        )
+        .with_context(|| format!("removing worktree for {}", current.label))?
     {
         removed.push(current);
     }
