@@ -152,6 +152,18 @@ Usage: <b><span class=c>wt step commit</span></b> <span class=c>[OPTIONS]</span>
   <b><span class=c>-h</span></b>, <b><span class=c>--help</span></b>
           Print help (see a summary with &#39;-h&#39;)
 
+<b><span class=g>Automation:</span></b>
+      <b><span class=c>--format</span></b><span class=c> &lt;FORMAT&gt;</span>
+          Output format
+
+          JSON prints structured result to stdout after the commit completes.
+
+          Possible values:
+          - <b><span class=c>text</span></b>: Human-readable text output
+          - <b><span class=c>json</span></b>: JSON output
+
+          [default: text]
+
 <b><span class=g>Global Options:</span></b>
   <b><span class=c>-C</span></b><span class=c> &lt;path&gt;</span>
           Working directory for this command
@@ -234,6 +246,18 @@ Usage: <b><span class=c>wt step squash</span></b> <span class=c>[OPTIONS]</span>
 
   <b><span class=c>-h</span></b>, <b><span class=c>--help</span></b>
           Print help (see a summary with &#39;-h&#39;)
+
+<b><span class=g>Automation:</span></b>
+      <b><span class=c>--format</span></b><span class=c> &lt;FORMAT&gt;</span>
+          Output format
+
+          JSON prints structured result to stdout after the squash completes.
+
+          Possible values:
+          - <b><span class=c>text</span></b>: Human-readable text output
+          - <b><span class=c>json</span></b>: JSON output
+
+          [default: text]
 
 <b><span class=g>Global Options:</span></b>
   <b><span class=c>-C</span></b><span class=c> &lt;path&gt;</span>
@@ -436,6 +460,18 @@ Usage: <b><span class=c>wt step copy-ignored</span></b> <span class=c>[OPTIONS]<
 
   <b><span class=c>-h</span></b>, <b><span class=c>--help</span></b>
           Print help (see a summary with &#39;-h&#39;)
+
+<b><span class=g>Automation:</span></b>
+      <b><span class=c>--format</span></b><span class=c> &lt;FORMAT&gt;</span>
+          Output format
+
+          JSON prints structured result to stdout after the copy completes.
+
+          Possible values:
+          - <b><span class=c>text</span></b>: Human-readable text output
+          - <b><span class=c>json</span></b>: JSON output
+
+          [default: text]
 
 <b><span class=g>Global Options:</span></b>
   <b><span class=c>-C</span></b><span class=c> &lt;path&gt;</span>
@@ -831,6 +867,18 @@ Usage: <b><span class=c>wt step relocate</span></b> <span class=c>[OPTIONS]</spa
 
   <b><span class=c>-h</span></b>, <b><span class=c>--help</span></b>
           Print help (see a summary with &#39;-h&#39;)
+
+<b><span class=g>Automation:</span></b>
+      <b><span class=c>--format</span></b><span class=c> &lt;FORMAT&gt;</span>
+          Output format
+
+          JSON prints structured result to stdout after the relocate completes.
+
+          Possible values:
+          - <b><span class=c>text</span></b>: Human-readable text output
+          - <b><span class=c>json</span></b>: JSON output
+
+          [default: text]
 
 <b><span class=g>Global Options:</span></b>
   <b><span class=c>-C</span></b><span class=c> &lt;path&gt;</span>

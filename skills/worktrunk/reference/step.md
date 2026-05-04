@@ -147,6 +147,18 @@ Options:
   -h, --help
           Print help (see a summary with '-h')
 
+Automation:
+      --format <FORMAT>
+          Output format
+
+          JSON prints structured result to stdout after the commit completes.
+
+          Possible values:
+          - text: Human-readable text output
+          - json: JSON output
+
+          [default: text]
+
 Global Options:
   -C <path>
           Working directory for this command
@@ -233,6 +245,18 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+
+Automation:
+      --format <FORMAT>
+          Output format
+
+          JSON prints structured result to stdout after the squash completes.
+
+          Possible values:
+          - text: Human-readable text output
+          - json: JSON output
+
+          [default: text]
 
 Global Options:
   -C <path>
@@ -445,6 +469,18 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+
+Automation:
+      --format <FORMAT>
+          Output format
+
+          JSON prints structured result to stdout after the copy completes.
+
+          Possible values:
+          - text: Human-readable text output
+          - json: JSON output
+
+          [default: text]
 
 Global Options:
   -C <path>
@@ -874,6 +910,18 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+
+Automation:
+      --format <FORMAT>
+          Output format
+
+          JSON prints structured result to stdout after the relocate completes.
+
+          Possible values:
+          - text: Human-readable text output
+          - json: JSON output
+
+          [default: text]
 
 Global Options:
   -C <path>
