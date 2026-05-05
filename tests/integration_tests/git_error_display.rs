@@ -1,6 +1,9 @@
 use insta::assert_snapshot;
 use std::path::PathBuf;
-use worktrunk::git::{FailedCommand, GitError, HookType, WorktrunkError, add_hook_skip_hint};
+use worktrunk::git::{
+    Diagnostic, FailedCommand, GitError, HookErrorWithHint, HookType, WorktrunkError,
+    add_hook_skip_hint,
+};
 
 // ============================================================================
 // Worktree errors
@@ -15,7 +18,7 @@ fn display_worktree_removal_failed() {
         remaining_entries: None,
     };
 
-    assert_snapshot!("worktree_removal_failed", err.to_string());
+    assert_snapshot!("worktree_removal_failed", err.render());
 }
 
 #[test]
@@ -31,10 +34,7 @@ fn display_worktree_removal_failed_directory_not_empty() {
         ]),
     };
 
-    assert_snapshot!(
-        "worktree_removal_failed_directory_not_empty",
-        err.to_string()
-    );
+    assert_snapshot!("worktree_removal_failed_directory_not_empty", err.render());
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn display_worktree_removal_failed_with_remaining_entries() {
 
     assert_snapshot!(
         "worktree_removal_failed_with_remaining_entries",
-        err.to_string()
+        err.render()
     );
 }
 
@@ -63,7 +63,7 @@ fn display_worktree_removal_failed_many_remaining_entries() {
 
     assert_snapshot!(
         "worktree_removal_failed_many_remaining_entries",
-        err.to_string()
+        err.render()
     );
 }
 
@@ -76,7 +76,7 @@ fn display_worktree_creation_failed() {
         command: None,
     };
 
-    assert_snapshot!("worktree_creation_failed", err.to_string());
+    assert_snapshot!("worktree_creation_failed", err.render());
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn display_worktree_creation_failed_with_command() {
         }),
     };
 
-    assert_snapshot!("worktree_creation_failed_with_command", err.to_string());
+    assert_snapshot!("worktree_creation_failed_with_command", err.render());
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn display_worktree_missing() {
         branch: "stale-branch".into(),
     };
 
-    assert_snapshot!("worktree_missing", err.to_string());
+    assert_snapshot!("worktree_missing", err.render());
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn branch_not_found() {
         pr_mr_platform: None,
     };
 
-    assert_snapshot!("branch_not_found", err.to_string());
+    assert_snapshot!("branch_not_found", err.render());
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn branch_not_found_with_fetch_time() {
         pr_mr_platform: None,
     };
 
-    assert_snapshot!("branch_not_found_with_fetch_time", err.to_string());
+    assert_snapshot!("branch_not_found_with_fetch_time", err.render());
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn branch_not_found_no_create_hint() {
         pr_mr_platform: None,
     };
 
-    assert_snapshot!("branch_not_found_no_create_hint", err.to_string());
+    assert_snapshot!("branch_not_found_no_create_hint", err.render());
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn branch_not_found_numeric_unknown_platform() {
         pr_mr_platform: None,
     };
 
-    assert_snapshot!("branch_not_found_numeric_unknown_platform", err.to_string());
+    assert_snapshot!("branch_not_found_numeric_unknown_platform", err.render());
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn branch_not_found_numeric_github() {
         pr_mr_platform: Some(RefType::Pr),
     };
 
-    assert_snapshot!("branch_not_found_numeric_github", err.to_string());
+    assert_snapshot!("branch_not_found_numeric_github", err.render());
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn branch_not_found_numeric_gitlab() {
         pr_mr_platform: Some(RefType::Mr),
     };
 
-    assert_snapshot!("branch_not_found_numeric_gitlab", err.to_string());
+    assert_snapshot!("branch_not_found_numeric_gitlab", err.render());
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn display_worktree_path_occupied() {
         occupant: Some("other-branch".into()),
     };
 
-    assert_snapshot!("worktree_path_occupied", err.to_string());
+    assert_snapshot!("worktree_path_occupied", err.render());
 }
 
 #[test]
@@ -198,14 +198,14 @@ fn display_worktree_path_exists() {
         create: false,
     };
 
-    assert_snapshot!("worktree_path_exists", err.to_string());
+    assert_snapshot!("worktree_path_exists", err.render());
 }
 
 #[test]
 fn display_cannot_remove_main_worktree() {
     let err = GitError::CannotRemoveMainWorktree;
 
-    assert_snapshot!("cannot_remove_main_worktree", err.to_string());
+    assert_snapshot!("cannot_remove_main_worktree", err.render());
 }
 
 // ============================================================================
@@ -218,14 +218,14 @@ fn display_detached_head() {
         action: Some("merge".into()),
     };
 
-    assert_snapshot!("detached_head", err.to_string());
+    assert_snapshot!("detached_head", err.render());
 }
 
 #[test]
 fn display_detached_head_no_action() {
     let err = GitError::DetachedHead { action: None };
 
-    assert_snapshot!("detached_head_no_action", err.to_string());
+    assert_snapshot!("detached_head_no_action", err.render());
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn display_uncommitted_changes() {
         force_hint: false,
     };
 
-    assert_snapshot!("uncommitted_changes", err.to_string());
+    assert_snapshot!("uncommitted_changes", err.render());
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn display_uncommitted_changes_with_branch() {
         force_hint: false,
     };
 
-    assert_snapshot!("uncommitted_changes_with_branch", err.to_string());
+    assert_snapshot!("uncommitted_changes_with_branch", err.render());
 }
 
 #[test]
@@ -258,7 +258,7 @@ fn display_uncommitted_changes_with_force_hint() {
         force_hint: true,
     };
 
-    assert_snapshot!("uncommitted_changes_with_force_hint", err.to_string());
+    assert_snapshot!("uncommitted_changes_with_force_hint", err.render());
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn display_branch_already_exists() {
         branch: "feature".into(),
     };
 
-    assert_snapshot!("branch_already_exists", err.to_string());
+    assert_snapshot!("branch_already_exists", err.render());
 }
 
 // ============================================================================
@@ -281,7 +281,7 @@ fn display_push_failed() {
         error: "To /Users/user/workspace/repo/.git\n ! [remote rejected] HEAD -> main (Up-to-date check failed)\nerror: failed to push some refs to '/Users/user/workspace/repo/.git'".into(),
     };
 
-    assert_snapshot!("push_failed", err.to_string());
+    assert_snapshot!("push_failed", err.render());
 }
 
 #[test]
@@ -292,7 +292,7 @@ fn display_conflicting_changes() {
         worktree_path: PathBuf::from("/tmp/repo.main"),
     };
 
-    assert_snapshot!("conflicting_changes", err.to_string());
+    assert_snapshot!("conflicting_changes", err.render());
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn display_not_fast_forward() {
         in_merge_context: false,
     };
 
-    assert_snapshot!("not_fast_forward", err.to_string());
+    assert_snapshot!("not_fast_forward", err.render());
 }
 
 #[test]
@@ -314,7 +314,7 @@ fn display_not_fast_forward_merge_context() {
         in_merge_context: true,
     };
 
-    assert_snapshot!("not_fast_forward_merge_context", err.to_string());
+    assert_snapshot!("not_fast_forward_merge_context", err.render());
 }
 
 #[test]
@@ -324,7 +324,7 @@ fn display_rebase_conflict() {
         git_output: "CONFLICT (content): Merge conflict in src/main.rs".into(),
     };
 
-    assert_snapshot!("rebase_conflict", err.to_string());
+    assert_snapshot!("rebase_conflict", err.render());
 }
 
 // ============================================================================
@@ -335,7 +335,7 @@ fn display_rebase_conflict() {
 fn display_not_interactive() {
     let err = GitError::NotInteractive;
 
-    assert_snapshot!("not_interactive", err.to_string());
+    assert_snapshot!("not_interactive", err.render());
 }
 
 #[test]
@@ -346,7 +346,7 @@ fn display_llm_command_failed() {
         reproduction_command: None,
     };
 
-    assert_snapshot!("llm_command_failed", err.to_string());
+    assert_snapshot!("llm_command_failed", err.render());
 }
 
 #[test]
@@ -357,7 +357,7 @@ fn display_llm_command_failed_with_reproduction() {
         reproduction_command: Some("wt step commit --show-prompt | llm --model claude".into()),
     };
 
-    assert_snapshot!("llm_command_failed_with_reproduction", err.to_string());
+    assert_snapshot!("llm_command_failed_with_reproduction", err.render());
 }
 
 #[test]
@@ -366,7 +366,7 @@ fn display_project_config_not_found() {
         config_path: PathBuf::from("/tmp/repo/.config/wt.toml"),
     };
 
-    assert_snapshot!("project_config_not_found", err.to_string());
+    assert_snapshot!("project_config_not_found", err.render());
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn display_parse_error() {
         message: "Invalid branch name format".into(),
     };
 
-    assert_snapshot!("parse_error", err.to_string());
+    assert_snapshot!("parse_error", err.render());
 }
 
 #[test]
@@ -385,7 +385,7 @@ fn display_remote_only_branch() {
         remote: "origin".into(),
     };
 
-    assert_snapshot!("remote_only_branch", err.to_string());
+    assert_snapshot!("remote_only_branch", err.render());
 }
 
 #[test]
@@ -394,7 +394,7 @@ fn display_other() {
         message: "Unexpected git error".into(),
     };
 
-    assert_snapshot!("other", err.to_string());
+    assert_snapshot!("other", err.render());
 }
 
 // ============================================================================
@@ -410,7 +410,7 @@ fn display_hook_command_failed_with_name() {
         exit_code: Some(1),
     };
 
-    assert_snapshot!("hook_command_failed_with_name", err.to_string());
+    assert_snapshot!("hook_command_failed_with_name", err.render());
 }
 
 #[test]
@@ -422,7 +422,7 @@ fn display_hook_command_failed_without_name() {
         exit_code: Some(127),
     };
 
-    assert_snapshot!("hook_command_failed_without_name", err.to_string());
+    assert_snapshot!("hook_command_failed_without_name", err.render());
 }
 
 /// Shows the complete error with hint, as users would see it.
@@ -441,7 +441,10 @@ fn display_hook_command_failed_with_skip_hint() {
 
     assert_snapshot!(
         "hook_command_failed_with_skip_hint",
-        err_with_hint.to_string()
+        err_with_hint
+            .downcast_ref::<HookErrorWithHint>()
+            .expect("wrapped to HookErrorWithHint")
+            .render()
     );
 }
 

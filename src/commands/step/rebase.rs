@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 use color_print::cformat;
-use worktrunk::git::Repository;
+use worktrunk::git::{ErrorExt, Repository};
 use worktrunk::styling::{eprintln, progress_message, success_message};
 
 use super::super::repository_ext::RepositoryCliExt;
@@ -53,7 +53,7 @@ pub fn handle_rebase(target: Option<&str>) -> anyhow::Result<RebaseResult> {
         // Pull git's stderr from the typed leaf when present so we get the
         // raw conflict-marker bytes regardless of how many `.context(...)`
         // layers wrap the error.
-        let detail = worktrunk::git::display_message(&e);
+        let detail = e.display_message();
         if is_rebasing {
             return Err(worktrunk::git::GitError::RebaseConflict {
                 target_branch: integration_target,

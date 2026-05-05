@@ -30,7 +30,7 @@ use std::process::Stdio;
 
 use color_print::cformat;
 use worktrunk::config::{UserConfig, expand_template};
-use worktrunk::git::{Repository, WorktreeInfo, WorktrunkError, interrupt_exit_code};
+use worktrunk::git::{ErrorExt, Repository, WorktreeInfo, WorktrunkError};
 use worktrunk::shell_exec::Cmd;
 use worktrunk::styling::{
     eprintln, error_message, format_with_gutter, progress_message, success_message, warning_message,
@@ -105,32 +105,35 @@ pub fn step_for_each(args: Vec<String>, format: crate::cli::SwitchFormat) -> any
                 }
             }
             Err(err) => {
-                let signal_exit = interrupt_exit_code(&err);
-                let (exit_info, exit_code, error_msg, show_detail) =
+                let signal_exit = err.interrupt_exit_code();
+                // Two error strings: a styled block for stderr (preserves
+                // hints from typed diagnostics) and a plain string for
+                // JSON (consumers shouldn't see ANSI codes or symbols).
+                let (exit_info, exit_code, stderr_detail, json_detail) =
                     if let Some(WorktrunkError::ChildProcessExited { code, message, .. }) =
                         err.downcast_ref::<WorktrunkError>()
                     {
                         (
                             format!(" (exit code {code})"),
                             serde_json::json!(code),
+                            None,
                             message.clone(),
-                            false,
                         )
                     } else {
-                        let msg = err.to_string();
+                        let styled = err.render_diagnostic().unwrap_or_else(|| err.to_string());
                         (
                             " (spawn failed)".to_string(),
                             serde_json::json!(null),
-                            msg,
-                            true,
+                            Some(styled),
+                            err.to_string(),
                         )
                     };
                 eprintln!(
                     "{}",
                     error_message(cformat!("Failed in <bold>{display_name}</>{exit_info}"))
                 );
-                if show_detail {
-                    eprintln!("{}", format_with_gutter(&error_msg, None));
+                if let Some(detail) = &stderr_detail {
+                    eprintln!("{}", format_with_gutter(detail, None));
                 }
                 failed.push(display_name.to_string());
                 if json_mode {
@@ -139,7 +142,7 @@ pub fn step_for_each(args: Vec<String>, format: crate::cli::SwitchFormat) -> any
                         "path": wt.path,
                         "exit_code": exit_code,
                         "success": false,
-                        "error": error_msg,
+                        "error": json_detail,
                     }));
                 }
                 if let Some(code) = signal_exit {
