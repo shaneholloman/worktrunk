@@ -145,6 +145,25 @@ pub fn temp_home() -> TempDir {
     TempDir::new().unwrap()
 }
 
+/// Canonicalize a `temp_home` for use as a base when building paths that
+/// production code will compare against the exported HOME.
+///
+/// `set_temp_home_env` exports HOME via `dunce::canonicalize`, so paths the
+/// command later prints (e.g. the nushell vendor-autoload dir) only tilde-
+/// shorten in `format_path_for_display` when they share that canonical prefix.
+/// Two platform pitfalls make a bare `temp_home.path()` wrong:
+///
+/// - **macOS**: the temp dir lives under `/var`, a symlink to `/private/var`.
+///   Canonicalizing resolves it to match the exported HOME, so the printed path
+///   shortens to `~/...` instead of the full temp path.
+/// - **Windows**: `std::fs::canonicalize` returns a `\\?\` verbatim path, where
+///   the forward slashes in a later `.join("a/b/c")` are treated as literal
+///   filename characters rather than separators — breaking both the file write
+///   and `.exists()`. `dunce::canonicalize` returns an ordinary path.
+pub fn canonical_temp_home(temp_home: &TempDir) -> std::path::PathBuf {
+    dunce::canonicalize(temp_home.path()).unwrap()
+}
+
 /// Repo with remote tracking set up.
 ///
 /// Builds on the `repo` fixture, adding a "remote" for the default branch.
@@ -556,6 +575,11 @@ pub fn add_standard_env_redactions(settings: &mut insta::Settings) {
     settings.add_redaction(".env.PWD", "[PWD]");
     // Mock commands directory (temp path for mock gh/glab binaries)
     settings.add_redaction(".env.MOCK_CONFIG_DIR", "[MOCK_CONFIG_DIR]");
+    // Nushell vendor-autoload override (temp path pinned by shell-integration tests)
+    settings.add_redaction(
+        ".env.WORKTRUNK_TEST_NU_VENDOR_AUTOLOAD_DIR",
+        "[TEST_NU_VENDOR_AUTOLOAD]",
+    );
     // OpenCode config directory (platform-independent override for tests)
     settings.add_redaction(".env.OPENCODE_CONFIG_DIR", "[TEST_OPENCODE_CONFIG]");
     // `wt config show --full` tests inject WORKTRUNK_TEST_LATEST_VERSION = the
