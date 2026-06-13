@@ -623,52 +623,45 @@ pub fn add_standard_env_redactions(settings: &mut insta::Settings) {
         "[CARGO_LLVM_COV_TARGET_DIR]",
     );
 
-    // Drop the host-dependent `GIT_*` / `WORKTRUNK_*` scrub markers from the
-    // recorded `env:` block so it depends only on what the test affirmatively
-    // sets — identically on every contributor's machine.
+    // Drop empty-valued entries from the recorded `env:` block so it depends
+    // only on what the test affirmatively sets — identically on every
+    // contributor's machine.
     //
-    // `isolate_subprocess_env` scrubs every `GIT_*` / `WORKTRUNK_*` key it finds
-    // in the *parent* environment via `Command::env_remove`, and insta-cmd
-    // records each removed key as `KEY: ""` (it serializes `get_envs()`, which
-    // includes removals). Which keys appear is therefore a property of the host:
-    // CI has `GIT_EDITOR`, a contributor's box might have `GIT_PAGER`, neither,
-    // or both. insta never *compares* the `info:` block (only stdout/stderr/exit),
-    // so this only churns regenerated snapshots from machine to machine — but
-    // that churn is exactly what makes contributors think they have to match
-    // their local environment to CI. Normalizing it away here means they don't.
+    // insta-cmd records `Command::env_remove` calls as `KEY: ""` (it
+    // serializes `get_envs()`, which yields `None` for removals, rendered via
+    // `unwrap_or("")`), so a removal is indistinguishable from a deliberate
+    // set-to-empty — and the recorded line is false either way: the child sees
+    // no variable, not an empty one. Worse, `isolate_subprocess_env` scrubs
+    // every `GIT_*` / `WORKTRUNK_*` key it finds in the *parent* environment,
+    // so which markers appear is a property of the host: CI has `GIT_EDITOR`,
+    // a contributor's box might have `GIT_PAGER`, neither, or both. insta
+    // never *compares* the `info:` block (only stdout/stderr/exit), so this
+    // only churns regenerated snapshots from machine to machine — but that
+    // churn is exactly what makes contributors think they have to match their
+    // local environment to CI. Normalizing it away here means they don't.
     //
-    // This runs as its own pass after the per-key `.env.*` redactions above, so
-    // affirmatively-set *non-empty* vars (config paths → `[TEST_CONFIG]`,
-    // coverage → `[LLVM_PROFILE_FILE]`, etc.) already hold non-empty placeholders
-    // and are kept. The unconditional, explicitly-named scrubs (`NO_COLOR`,
-    // `SHELL`, `PSModulePath`) are deterministic across hosts and intentionally
-    // left as-is.
+    // This runs as its own pass after the per-key `.env.*` redactions above,
+    // so affirmatively-set vars (config paths → `[TEST_CONFIG]`, coverage →
+    // `[LLVM_PROFILE_FILE]`, etc.) already hold non-empty placeholders and are
+    // kept.
     //
-    // Caveat: the predicate keys on the empty *value*, which a scrub marker and
-    // an affirmatively-set empty `GIT_*` / `WORKTRUNK_*` var share — in the
-    // recorded YAML both serialize as `KEY: ""`, so this pass can't tell them
-    // apart and drops the affirmatively-set one too. The known case is
-    // `test_list_config_env_override_validation_failure`, which sets
-    // `WORKTRUNK_WORKTREE_PATH=""` as the test's subject (it triggers the
-    // "worktree-path cannot be empty" warning). That value is host-independent,
-    // so it isn't the churn this targets, but the next regen of its snapshot
-    // will drop the `WORKTRUNK_WORKTREE_PATH: ""` line — harmless, since insta
-    // never compares the `env:` block.
-    settings.add_dynamic_redaction(".env", |content, _path| {
-        strip_host_scrubbed_env_markers(content)
-    });
+    // Caveat: a test that affirmatively sets a var to `""` as its subject
+    // (e.g. `test_list_config_env_override_validation_failure` setting
+    // `WORKTRUNK_WORKTREE_PATH=""` to trigger the "worktree-path cannot be
+    // empty" warning) loses that header line too — the recorded YAML can't
+    // tell it apart from a removal. Harmless: the test body still asserts the
+    // warning, and insta never compares the `env:` block.
+    settings.add_dynamic_redaction(".env", |content, _path| drop_empty_env_entries(content));
 }
 
-/// Drop empty-valued `GIT_*` / `WORKTRUNK_*` entries from an insta-cmd `env`
-/// map node. These are usually the [`isolate_subprocess_env`](worktrunk::testing)
-/// scrub markers whose presence depends on the host environment; removing them
-/// makes the recorded block host-independent. An affirmatively-set empty value
-/// (e.g. `WORKTRUNK_WORKTREE_PATH=""`) is indistinguishable from a scrub marker
-/// in the recorded YAML and is dropped too — see the caveat on
+/// Drop empty-valued entries from an insta-cmd `env` map node. These are
+/// usually `Command::env_remove` markers — chiefly the
+/// [`isolate_subprocess_env`](worktrunk::testing) scrub, whose key set depends
+/// on the host environment; removing them makes the recorded block
+/// host-independent. An affirmatively-set empty value is indistinguishable
+/// from a removal in the recorded YAML and is dropped too — see the caveat on
 /// [`add_standard_env_redactions`].
-fn strip_host_scrubbed_env_markers(
-    content: insta::internals::Content,
-) -> insta::internals::Content {
+fn drop_empty_env_entries(content: insta::internals::Content) -> insta::internals::Content {
     use insta::internals::Content;
 
     let Content::Map(entries) = content else {
@@ -676,13 +669,7 @@ fn strip_host_scrubbed_env_markers(
     };
     let kept = entries
         .into_iter()
-        .filter(|(key, value)| {
-            let is_scrub_key = key
-                .as_str()
-                .is_some_and(|k| k.starts_with("GIT_") || k.starts_with("WORKTRUNK_"));
-            let is_empty = value.as_str() == Some("");
-            !(is_scrub_key && is_empty)
-        })
+        .filter(|(_, value)| value.as_str() != Some(""))
         .collect();
     Content::Map(kept)
 }
@@ -1424,12 +1411,13 @@ mod tests {
         });
     }
 
-    /// The `env:` redaction drops the host-dependent `GIT_*` / `WORKTRUNK_*`
-    /// scrub markers (`KEY: ""`) while keeping everything a test affirmatively
-    /// sets — including affirmatively-empty non-scrub vars and already-redacted
-    /// scrub vars that hold a placeholder. A non-map node passes through.
+    /// The `env:` redaction drops every empty-valued entry (`KEY: ""` — how
+    /// insta-cmd records `env_remove`, including the host-dependent
+    /// `GIT_*`/`WORKTRUNK_*` scrub and the unconditional `NO_COLOR`/`SHELL`/
+    /// `PSModulePath` scrubs) while keeping everything a test affirmatively
+    /// sets to a non-empty value. A non-map node passes through.
     #[test]
-    fn strip_host_scrubbed_env_markers_normalizes_env_block() {
+    fn drop_empty_env_entries_normalizes_env_block() {
         use insta::internals::Content;
 
         let env = Content::Map(vec![
@@ -1450,11 +1438,11 @@ mod tests {
                 Content::from("WORKTRUNK_TEST_CLAUDE_INSTALLED"),
                 Content::from("0"),
             ),
-            // Unconditional, explicitly-named scrubs are not GIT_/WORKTRUNK_ — kept.
+            // Unconditional, explicitly-named scrub — dropped like any removal.
             (Content::from("NO_COLOR"), Content::from("")),
         ]);
 
-        let Content::Map(kept) = strip_host_scrubbed_env_markers(env) else {
+        let Content::Map(kept) = drop_empty_env_entries(env) else {
             panic!("expected a map back");
         };
         let keys: Vec<&str> = kept.iter().filter_map(|(k, _)| k.as_str()).collect();
@@ -1465,12 +1453,11 @@ mod tests {
                 "LANG",
                 "WORKTRUNK_CONFIG_PATH",
                 "WORKTRUNK_TEST_CLAUDE_INSTALLED",
-                "NO_COLOR",
             ]
         );
 
         // Non-map nodes pass through untouched.
         let scalar = Content::from("not a map");
-        assert_eq!(strip_host_scrubbed_env_markers(scalar.clone()), scalar);
+        assert_eq!(drop_empty_env_entries(scalar.clone()), scalar);
     }
 }
