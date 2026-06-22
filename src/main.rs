@@ -672,7 +672,7 @@ fn handle_select_command(branches: bool, remotes: bool) -> anyhow::Result<()> {
     // Deprecated: show warning and delegate to handle_picker
     warn_select_deprecated();
     worktrunk::config::suppress_warnings();
-    handle_picker(branches, remotes, None, SwitchFormat::Text)
+    handle_picker(branches, remotes, false, None, SwitchFormat::Text)
 }
 
 #[cfg(not(unix))]
