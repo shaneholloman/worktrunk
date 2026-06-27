@@ -85,17 +85,19 @@ pub(super) type LocalContentSlot = Arc<Mutex<LocalContent>>;
 /// worktree path (which is unique) behind this prefix instead.
 pub(super) const WORKTREE_OUTPUT_PREFIX: &str = "worktree-path:";
 
-/// Per-row data the picker's `alt-y` (copy branch) and `alt-o` (open PR/MR URL)
-/// shortcuts need at key-press time, looked up by the row's `output()` token.
+/// Per-row data the picker needs at key-press time, looked up by the row's
+/// `output()` token: the `alt-y` (copy branch) / `alt-o` (open PR/MR URL)
+/// shortcuts, and the `alt-x` in-place branch morph (see [`MorphHandle`]).
 ///
-/// The shortcut callbacks read the *selected* `Arc<dyn SkimItem>` straight off
-/// skim's `App`, but skim's cross-thread `downcast_ref` is unreliable (see
-/// `picker_item_identifier`), so the row's typed fields aren't reachable that
-/// way. This table carries them instead, keyed by the same `output()` token
-/// both sides already share. It's filled where the rows are built —
-/// `progressive_handler::on_skeleton` for worktree/branch rows,
+/// The callbacks read the *selected* `Arc<dyn SkimItem>` straight off skim's
+/// `App`, but skim's cross-thread `downcast_ref` is unreliable (see
+/// `picker_item_identifier`), so the row's typed fields and shared slots aren't
+/// reachable that way. This table carries them instead, keyed by the same
+/// `output()` token both sides already share. It's filled where the rows are
+/// built — `progressive_handler::on_skeleton` for worktree/branch rows,
 /// `prs::stream_open_prs` for `--prs` rows — and read by the keybinding
-/// callbacks in `picker::install_shortcut_keybindings`.
+/// callbacks in `picker::install_shortcut_keybindings` and the `alt-x` removal
+/// in `picker::PickerCollector`.
 pub(super) struct RowShortcutData {
     /// The row's branch name — what `alt-y` copies. `None` for a detached
     /// worktree (no branch), which makes `alt-y` a no-op rather than copying
@@ -104,6 +106,36 @@ pub(super) struct RowShortcutData {
     pub branch: Option<String>,
     /// Where `alt-o` finds the row's PR/MR URL.
     pub url: RowUrl,
+    /// Handles for the `alt-x` in-place branch morph, when this row is a
+    /// linked worktree whose branch could outlive it. `None` for `--prs` rows
+    /// and the primary worktree (nothing to morph into). See [`MorphHandle`].
+    pub morph: Option<MorphHandle>,
+}
+
+/// Shared handles that let `alt-x` morph a worktree row into a `/ branch` row
+/// in place — no reload, no cursor move — when a removal keeps the (unmerged)
+/// branch. The collector rewrites the row's display through these slots and
+/// flips [`morphed`](Self::morphed); the same `Arc`s back the live
+/// [`PickerRow`], so skim repaints the one row on the next `Event::Render`.
+///
+/// Reached by the collector through the shared [`RowShortcutData`] table (the
+/// `downcast_ref` route is unreliable cross-thread), so every field is an `Arc`
+/// the handler already built for the row in `on_skeleton`.
+pub(super) struct MorphHandle {
+    /// Worktree snapshot — the source the collector clones (flipping `kind` to
+    /// `Branch`) to render the `/ branch` line on the live layout.
+    pub item: Arc<ListItem>,
+    /// skim's display source for this row. The morph swaps the worktree line
+    /// for the rendered branch line here; the revert (failed removal) swaps it
+    /// back.
+    pub rendered: Arc<Mutex<String>>,
+    /// Dimmed to `working_tree: Some(false)` on morph so the `working_tree`
+    /// preview tab — there's no worktree left to diff — reads as empty.
+    pub local_content: LocalContentSlot,
+    /// Shared with [`PickerRow::output`]: once set, the row's selection
+    /// token is the bare branch name (a branch-only row) instead of the
+    /// worktree path.
+    pub morphed: Arc<AtomicBool>,
 }
 
 /// Source of a row's PR/MR URL for the `alt-o` shortcut.
@@ -134,6 +166,14 @@ impl RowUrl {
 /// callbacks (which read it). Rebuilt on every skeleton, so a refresh re-collect
 /// repopulates it.
 pub(super) type ShortcutTable = Arc<Mutex<std::collections::HashMap<String, RowShortcutData>>>;
+
+/// The collect [`LayoutConfig`](crate::commands::list::layout::LayoutConfig),
+/// handed from the collect thread to the picker so `alt-x` can render a
+/// `/ branch` row on the same grid as the worktree rows (the in-place morph).
+/// `LayoutConfig` is `!Sync`, so it rides behind a lock; `None` until the first
+/// skeleton lands, overwritten on each refresh. Shared (like [`ShortcutTable`])
+/// between the per-spawn handler that fills it and the collector that reads it.
+pub(super) type LayoutSlot = Arc<Mutex<Option<crate::commands::list::layout::LayoutConfig>>>;
 
 /// The `output()` token for a worktree/branch row: the unique worktree path
 /// (behind [`WORKTREE_OUTPUT_PREFIX`]) for any worktree-backed row, else the
@@ -335,6 +375,12 @@ pub(super) struct LocalCheckout {
     /// handler mirrors them here as the pipeline lands — letting those tabs dim
     /// once their diff is known empty (see [`LocalContent`]).
     pub local_content: LocalContentSlot,
+    /// Set when an `alt-x` removal kept this row's branch and morphed the row to
+    /// `/ branch` in place: [`PickerRow::output`] then yields the bare branch
+    /// name (a branch-only row) instead of the worktree path. Shared with the
+    /// row's [`MorphHandle`], which the collector flips when the worktree is
+    /// removed but its branch kept.
+    pub morphed: Arc<AtomicBool>,
 }
 
 impl PickerRow {
@@ -383,6 +429,15 @@ impl SkimItem for PickerRow {
     }
 
     fn output(&self) -> Cow<'_, str> {
+        // An `alt-x` morph turned this worktree row into a branch-only row: its
+        // selection token is the bare branch name, like any branch row (so a
+        // later switch/`alt-x` treats it as a branch, and `alt-y` finds it under
+        // the re-keyed token). `--prs` rows have no `local`, so they never morph.
+        if let Some(local) = &self.local
+            && local.morphed.load(Ordering::Relaxed)
+        {
+            return Cow::Owned(self.branch_name.clone());
+        }
         // Precomputed at construction (a worktree-path/branch token, or `pr:N`);
         // see `output_token`. Distinct from `preview_key`.
         Cow::Borrowed(&self.output_token)
@@ -1502,6 +1557,7 @@ mod tests {
                 has_upstream: false,
                 summaries_enabled: false,
                 local_content: Arc::new(Mutex::new(LocalContent::default())),
+                morphed: Arc::new(AtomicBool::new(false)),
             }),
         }
     }
@@ -2240,6 +2296,7 @@ mod tests {
                 has_upstream: false,
                 summaries_enabled: false,
                 local_content: Arc::new(Mutex::new(LocalContent::default())),
+                morphed: Arc::new(AtomicBool::new(false)),
             }),
         };
 

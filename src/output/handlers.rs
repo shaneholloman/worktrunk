@@ -526,8 +526,12 @@ struct BranchDeletionDisplay {
 
 /// The canonical "branch retained because unmerged" info + hint lines, as an
 /// `(info, hint)` pair. [`print_retained_unmerged_branch`] prints them; the
-/// picker's `keep_unremovable_row` stashes them (it can't print mid-render).
-/// Shared so the two emit paths can't drift in wording, flag, or styling.
+/// picker stashes them via `stash_retained_unmerged_branch` (it can't print
+/// mid-render) from its branch-only keep path — a `/ branch` row whose unmerged
+/// branch `SafeDelete` declines to delete stays put, so this explains the no-op.
+/// (A worktree removal that keeps its branch transforms the row to `/ branch`
+/// live instead, with no stashed message.) Shared so the emit paths can't drift
+/// in wording, flag, or styling.
 pub(crate) fn retained_unmerged_branch_messages(branch_name: &str) -> (String, String) {
     let info = info_message(cformat!(
         "Branch <bold>{branch_name}</> retained; has unmerged changes"

@@ -52,8 +52,9 @@ use super::super::list::ci_status::PrStatus;
 const RENDER_THROTTLE: Duration = Duration::from_millis(16);
 
 use super::items::{
-    HeaderLoading, HeaderSkimItem, LocalCheckout, LocalContent, LocalContentSlot, PickerRow,
-    PrStatusSlot, PreviewCache, RowShortcutData, RowUrl, ShortcutTable, worktree_output_token,
+    HeaderLoading, HeaderSkimItem, LayoutSlot, LocalCheckout, LocalContent, LocalContentSlot,
+    MorphHandle, PickerRow, PrStatusSlot, PreviewCache, RowShortcutData, RowUrl, ShortcutTable,
+    worktree_output_token,
 };
 use super::preview::PreviewMode;
 use super::preview_orchestrator::PreviewOrchestrator;
@@ -139,6 +140,10 @@ pub(super) struct PickerHandler {
     /// skips PRs already represented). Filled in `on_skeleton`. See
     /// [`super::prs::Skeleton`].
     pub(super) grid_slot: Arc<super::prs::GridSlot>,
+    /// Handoff of the full collect layout to `PickerCollector`, filled in
+    /// `provide_layout` and read at `alt-x` time to render a `/ branch` row on
+    /// the same grid (the in-place morph). See [`LayoutSlot`].
+    pub(super) layout_slot: LayoutSlot,
     /// Shared with the header: `Some(true)` while the `--prs` forge call is in
     /// flight, so the header shows a "loading…" marker. The `--prs` thread
     /// clears it when the fetch resolves. `None` on non-`--prs` pickers.
@@ -383,6 +388,23 @@ impl PickerProgressHandler for PickerHandler {
                 Arc::new(Mutex::new(LocalContent::from_item(&item_arc)));
             local_content_slots.push(Arc::clone(&local_content_arc));
 
+            // `alt-x` morph handles: a non-primary worktree row with a branch
+            // can have that branch outlive a removal, so the row morphs to
+            // `/ branch` in place. The primary worktree (can't be removed),
+            // detached worktrees (no branch), and branch-only rows (nothing to
+            // morph from) carry no handle. Shares the row's live `Arc`s so the
+            // collector's mutation surfaces on the same item skim renders.
+            let morphed = Arc::new(AtomicBool::new(false));
+            let morph = (item_arc.worktree_data().is_some()
+                && item_arc.branch.is_some()
+                && !item_arc.is_main())
+            .then(|| MorphHandle {
+                item: Arc::clone(&item_arc),
+                rendered: Arc::clone(&rendered_arc),
+                local_content: Arc::clone(&local_content_arc),
+                morphed: Arc::clone(&morphed),
+            });
+
             // Shortcut lookup for this row: `alt-y` copies `branch`, `alt-o`
             // opens the URL once the live `pr_status` slot reports one. Carry the
             // raw `Option` (not `branch_name()`'s `"(detached)"` fallback) so
@@ -393,6 +415,7 @@ impl PickerProgressHandler for PickerHandler {
                 RowShortcutData {
                     branch: item_arc.branch.clone(),
                     url: RowUrl::Live(Arc::clone(&pr_status_arc)),
+                    morph,
                 },
             );
 
@@ -409,6 +432,7 @@ impl PickerProgressHandler for PickerHandler {
                     has_upstream,
                     summaries_enabled,
                     local_content: local_content_arc,
+                    morphed,
                 }),
             }) as Arc<dyn SkimItem>);
         }
@@ -521,6 +545,12 @@ impl PickerProgressHandler for PickerHandler {
         self.stashed_warnings.lock().unwrap().push(line);
     }
 
+    fn provide_layout(&self, layout: &crate::commands::list::layout::LayoutConfig) {
+        // Stow a clone for `PickerCollector` to render the `alt-x` `/ branch`
+        // row on this grid. Overwritten each skeleton (a refresh re-collects).
+        *self.layout_slot.lock().unwrap() = Some(layout.clone());
+    }
+
     fn on_collect_complete(&self) {
         // Collection is done — `on_update` may have throttled away the last
         // row's repaint, so force one final frame that reflects every slot.
@@ -579,6 +609,7 @@ mod tests {
             stashed_warnings: Arc::new(Mutex::new(Vec::new())),
             deferred_items: OnceLock::new(),
             grid_slot: Arc::new(super::super::prs::GridSlot::new()),
+            layout_slot: Arc::new(Mutex::new(None)),
             prs_loading: None,
         }
     }

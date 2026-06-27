@@ -120,21 +120,25 @@ use skim::reader::CommandCollector;
 use skim::tui::event::ActionCallback;
 use worktrunk::HookType;
 use worktrunk::config::Approvals;
-use worktrunk::git::{Repository, current_or_recover};
+use worktrunk::git::{ErrorExt, Repository, current_or_recover};
 use worktrunk::path::format_path_for_display;
-use worktrunk::styling::{eprintln, warning_message};
+use worktrunk::styling::{
+    eprintln, hint_message, info_message, strip_osc8_hyperlinks, warning_message,
+};
 
 use super::hook_plan::{ApprovedHookPlan, HookPlanBuilder};
 use super::hooks::HookAnnouncer;
 use super::list::collect;
+use super::list::model::{BranchScope, ItemKind, ListItem};
 use super::list::progressive::RenderTarget;
+use super::list::render::PLACEHOLDER;
 use super::repository_ext::{RemoveTarget, RepositoryCliExt};
 use super::worktree::{RemoveResult, SwitchPipeline};
 use crate::cli::SwitchFormat;
 use crate::output::{BackgroundFallbackMode, handle_remove_output};
 use worktrunk::git::{BranchDeletionMode, delete_branch_if_safe};
 
-use items::{PreviewCache, ShortcutTable, WORKTREE_OUTPUT_PREFIX};
+use items::{LocalContent, LocalContentSlot, PreviewCache, ShortcutTable, WORKTREE_OUTPUT_PREFIX};
 use preview::{PreviewLayout, PreviewMode, PreviewState, PreviewStateData};
 use preview_orchestrator::PreviewOrchestrator;
 
@@ -142,6 +146,15 @@ use preview_orchestrator::PreviewOrchestrator;
 /// terminal (or in the dry-run path after the bg thread joins) — eprintln
 /// during the picker would corrupt skim's frame, so collect routes warnings
 /// through `PickerProgressHandler::stash_warning` and we emit them here.
+///
+/// TODO(picker-feedback): the declined-removal diagnostics (the main-worktree /
+/// dirty / unmerged "can't remove this row" messages from the `alt-x` keep paths)
+/// only surface here, on exit — the user presses `alt-x`, the row visibly stays,
+/// and the reason scrolls past after they quit. Consider a short in-picker message
+/// at `alt-x` time so the *why* lands immediately. skim has no footer slot (see the
+/// dropped Stall-indicator work), so the realistic slot is the header line — swap
+/// it to a transient "main worktree can't be removed" for a beat, then restore. The
+/// stash stays the fallback for background failures that surface after exit.
 fn drain_stashed_warnings(stash: &Mutex<Vec<String>>) {
     for line in stash.lock().unwrap().drain(..) {
         eprintln!("{line}");
@@ -258,8 +271,18 @@ struct PickerCollector {
     /// Same warning stash the progressive handler fills (drained to stderr once
     /// skim releases the terminal). A failed background removal pushes a
     /// `worktree kept` warning here so the user learns the row that flickered
-    /// back didn't actually go away. See [`restore_failed_removal`].
+    /// back (or un-morphed) didn't actually go away. See [`restore_failed_removal`]
+    /// and [`revert_morph`].
     stashed_warnings: Arc<Mutex<Vec<String>>>,
+    /// The `output()` token of the row displayed just below the selected one,
+    /// captured by the `alt-x` keybinding *before* its `reload(remove {})` resets
+    /// the cursor to the top. A drop consumes it to land the cursor on the row
+    /// that slides up — by identity, since the removed row's `shared_items` index
+    /// doesn't map to skim's filtered/reordered `item_list` (an active query made
+    /// an index land +N rows off). `None` when the selected row was last (no
+    /// successor → land on the new last row). See the `alt-x` bind in `handle_picker`
+    /// and [`reposition_cursor_action`].
+    drop_landing: Arc<Mutex<Option<String>>>,
 }
 
 impl PickerCollector {
@@ -391,18 +414,19 @@ impl PickerCollector {
 
     /// Drop the selected row and remove its target on a background thread.
     ///
-    /// For a removal [`removal_will_remove_target`] predicts will actually remove
-    /// the target (a clean worktree, or an integrated / force-deleted branch). The
-    /// `output()` token is unique per row (a `worktree-path:` path for worktrees),
-    /// so this drops exactly the selected row even when several detached rows share
-    /// the `(detached)` branch label.
+    /// For a removal that will remove the row entirely — a worktree whose branch
+    /// is *also* deleted (integrated, or force), or a force-deleted branch-only
+    /// row. A worktree removal that *keeps* its branch never reaches here; that's
+    /// the in-place morph ([`morph_and_remove_in_background`](Self::morph_and_remove_in_background)).
+    /// The `output()` token is unique per row (a `worktree-path:` path for
+    /// worktrees), so this drops exactly the selected row even when several
+    /// detached rows share the `(detached)` branch label.
     ///
     /// The row drops optimistically so the list stays snappy; the git work runs on
     /// a background thread off skim's event loop. The dropped row is restored only
     /// when the target survives — observed directly ([`removal_target_still_present`]),
     /// not inferred from `do_removal`'s `Result`, which is `Err` after a successful
-    /// removal whose `post-remove` hook fails to render/spawn, and `Ok` after an
-    /// integrated→unmerged race leaves the branch in place. This keeps the list
+    /// removal whose `post-remove` hook fails to render/spawn. This keeps the list
     /// from showing a removal that didn't happen without ever resurrecting a row
     /// for a target that's actually gone.
     fn drop_and_remove_in_background(
@@ -412,39 +436,25 @@ impl PickerCollector {
         result: RemoveResult,
     ) {
         // Capture the removed row (and its position) before dropping it: the
-        // position restores the cursor to that slot (the row that slides up) after
-        // the reload — see `reposition_cursor_action` — and the row itself is
-        // handed to the background thread so it can put the row back if the removal
-        // fails (see `restore_failed_removal`).
-        let (removed, reposition_target) = {
+        // position is handed to the background thread so it can put the row back
+        // at its slot if the removal fails (see `restore_failed_removal`). The
+        // cursor lands by identity on the row that slid up — its token was
+        // captured before the reload by the `alt-x` binding (see
+        // `reposition_cursor_action`), since the removed row's `shared_items`
+        // index doesn't map to skim's filtered/reordered `item_list`.
+        let removed = {
             let mut items = self.items.lock().unwrap();
             let removed = items
                 .iter()
                 .position(|item| item.output().as_ref() == selected_output)
                 .map(|pos| (Arc::clone(&items[pos]), pos));
             items.retain(|item| item.output().as_ref() != selected_output);
-            let remaining_data_rows = items.len().saturating_sub(PICKER_HEADER_ROWS);
-            let target = removed
-                .as_ref()
-                .and_then(|(_, pos)| sticky_reposition_target(*pos, remaining_data_rows));
-            (removed, target)
+            removed
         };
-
-        // If removing the current worktree, cd to home so skim and git commands
-        // continue to work after the directory disappears.
-        if matches!(
-            &result,
-            RemoveResult::RemovedWorktree {
-                changed_directory: true,
-                ..
-            }
-        ) && let Some(home) = result.destination_path()
-        {
-            let _ = std::env::set_current_dir(home);
-            if let Ok(repo) = Repository::at(home) {
-                self.repo = repo;
-            }
-        }
+        // The row displayed just below the removed one, captured before this
+        // reload reset the cursor (`None` if the removed row was last — land on
+        // the new last row).
+        let reposition_target = self.drop_landing.lock().unwrap().take();
 
         // A user-facing (label, noun) for the `kept` message, taken from the result
         // before it moves into the background thread.
@@ -461,6 +471,9 @@ impl PickerCollector {
                 if let Err(e) = Self::do_removal(&repo, &result, &approvals) {
                     tracing::warn!(selected_output = %selected_output, error = %e, "picker: removal of '{selected_output}' errored: {e:#}");
                 }
+                // A removal that keeps its branch never reaches here — that's the
+                // morph path (`morph_and_remove_in_background`). So a surviving
+                // target means the removal itself failed: put the row back.
                 if removal_target_still_present(&repo, &result)
                     && let Some((item, pos)) = removed
                 {
@@ -476,14 +489,12 @@ impl PickerCollector {
                 }
             });
 
-        // Restore the cursor near the removed row. skim resets it to the top on
-        // every reload; inject a Custom action that moves it back to the removed
-        // row's slot once the reloaded rows land (`render_tx` is skim's event
-        // sender, set once the TUI is up — always present by the time a reload
-        // fires).
-        if let Some(target) = reposition_target {
-            send_reposition(&self.render_tx, target);
-        }
+        // Restore the cursor onto the row that slid into the removed row's slot.
+        // skim resets it to the top on every reload; inject a Custom action that
+        // lands it on the captured row once the reloaded rows land (`render_tx` is
+        // skim's event sender, set once the TUI is up — always present by the time
+        // a reload fires).
+        send_reposition(&self.render_tx, reposition_target);
     }
 
     /// Keep the selected row in place and explain why its target wasn't removed.
@@ -502,35 +513,258 @@ impl PickerCollector {
     fn keep_unremovable_row(&self, selected_output: &str, branch_name: &str) {
         // The canonical "retained; unmerged" info + hint `wt remove` prints,
         // shared so the picker copy can't drift (see
-        // `retained_unmerged_branch_messages`). Taking the branch name (not the
-        // whole `RemoveResult`) makes it unrepresentable for this keep path to be
-        // handed a `RemovedWorktree`, which always removes — see the dispatch in
-        // `invoke` and [`removal_will_remove_target`].
-        let (info, hint) = crate::output::retained_unmerged_branch_messages(branch_name);
+        // `stash_retained_unmerged_branch`). Taking the branch name (not the whole
+        // `RemoveResult`) makes it unrepresentable for this keep path to be handed
+        // a `RemovedWorktree`, which always removes — see the dispatch in `invoke`
+        // and [`removal_will_remove_target`].
+        stash_retained_unmerged_branch(&self.stashed_warnings, branch_name);
+        self.reposition_to_kept_row(selected_output);
+    }
+
+    /// Keep the current worktree's row in place and explain why the picker won't
+    /// remove it.
+    ///
+    /// Called from `invoke` when [`removal_targets_current_worktree`] is true —
+    /// alt-x on the worktree the picker was launched from. Removing it would have
+    /// to switch the shell elsewhere first (see `removal_targets_current_worktree`
+    /// for why that's disruptive mid-picker), so the row stays put and a hint to
+    /// switch away first is stashed, drained to stderr when the picker exits. The
+    /// row never drops and no `do_removal` runs, so this is the only removal path
+    /// that never reaches a background thread.
+    fn keep_current_worktree_row(&self, selected_output: &str) {
+        stash_current_worktree_hint(&self.stashed_warnings);
+        self.reposition_to_kept_row(selected_output);
+    }
+
+    /// Land the cursor back on a row that stayed in place. alt-x's reload resets
+    /// the cursor to the top even when the row didn't move, so the keep-in-place
+    /// paths ([`keep_unremovable_row`](Self::keep_unremovable_row),
+    /// [`keep_current_worktree_row`](Self::keep_current_worktree_row)) re-anchor it
+    /// on the row's slot.
+    fn reposition_to_kept_row(&self, selected_output: &str) {
+        // The row stayed put, so land back on it by its own token — identity, not
+        // an index, so it's right under an active query too.
+        send_reposition(&self.render_tx, Some(selected_output.to_string()));
+    }
+
+    /// Morph the selected worktree row into a `/ branch` row in place, then remove
+    /// the worktree on a background thread.
+    ///
+    /// For a `RemovedWorktree` removal that [`worktree_removal_keeps_branch`]
+    /// predicts will keep its (unmerged) branch. The row never leaves its slot:
+    /// the morph rewrites the row's shared `rendered` line to the branch line
+    /// (rendered on the live layout — gutter `+` → `/`, path blank), flips the
+    /// row's [`morphed`](items::LocalCheckout::morphed) flag (so `output()`
+    /// becomes the branch token), dims the `working_tree` preview tab (no worktree
+    /// left to diff), and re-keys the row's `alt-y`/`alt-o` shortcut entry to the
+    /// branch token. skim repaints just that row on the reload alt-x already
+    /// fires, and the cursor lands back on the same slot — no teleport, no reset.
+    ///
+    /// The morph is optimistic, like the drop path. The background thread runs the
+    /// git removal and, only if the worktree unexpectedly survives
+    /// ([`removal_target_still_present`] — a clean-check race, a locked dir, a
+    /// failing `pre-remove` hook), reverts the morph back to the worktree row via
+    /// [`revert_morph`] and surfaces why. (The branch can't flip integrated in the
+    /// millisecond between the prediction and the delete, so the only realistic
+    /// failure is the worktree removal itself.)
+    ///
+    /// Falls back to [`drop_and_remove_in_background`](Self::drop_and_remove_in_background)
+    /// when the row carries no [`MorphHandle`](items::MorphHandle) or the layout
+    /// hasn't landed — the worktree still removes, the row just drops instead of
+    /// morphing.
+    fn morph_and_remove_in_background(
+        &mut self,
+        selected_output: String,
+        branch: String,
+        planning_repo: Repository,
+        result: RemoveResult,
+    ) {
+        // Gather the row's shared morph handles and render the branch line on the
+        // live layout. Any gap (row not morphable, layout not yet handed over)
+        // means no clean in-place morph — drop the row instead, same end state.
+        let default_branch = self.repo.default_branch();
+        let prepared = {
+            let table = self.factory.shortcut_table.lock().unwrap();
+            let layout = self.factory.layout_slot.lock().unwrap();
+            match (
+                table.get(&selected_output).and_then(|d| d.morph.as_ref()),
+                layout.as_ref(),
+            ) {
+                (Some(handle), Some(layout)) => {
+                    let (branch_line, branch_local) =
+                        build_morph_branch_row(layout, &handle.item, default_branch.as_deref());
+                    Some(MorphSlots {
+                        rendered: Arc::clone(&handle.rendered),
+                        morphed: Arc::clone(&handle.morphed),
+                        local_content: Arc::clone(&handle.local_content),
+                        branch_line,
+                        branch_local,
+                    })
+                }
+                _ => None,
+            }
+        };
+        let Some(slots) = prepared else {
+            self.drop_and_remove_in_background(selected_output, planning_repo, result);
+            return;
+        };
+
+        // The row stays put but flips its identity: after the morph its `output()`
+        // is the branch token. Land the cursor back on it by that token (captured
+        // here, before `branch` moves into the background thread below).
+        let reposition_target = Some(branch.clone());
+
+        // Snapshot the pre-morph display for the revert, then apply the morph.
+        let original_rendered = slots.rendered.lock().unwrap().clone();
+        let original_local = *slots.local_content.lock().unwrap();
+        *slots.rendered.lock().unwrap() = slots.branch_line;
+        slots.morphed.store(true, Ordering::Relaxed);
+        *slots.local_content.lock().unwrap() = slots.branch_local;
+
+        // Re-key the `alt-y`/`alt-o` lookup to the branch token (the row's new
+        // `output()`); the revert moves it back.
         {
-            let mut stashed = self.stashed_warnings.lock().unwrap();
-            // Dedup on repeated alt-x of the same kept row.
-            if !stashed.contains(&info) {
-                stashed.push(info);
-                stashed.push(hint);
+            let mut table = self.factory.shortcut_table.lock().unwrap();
+            if let Some(data) = table.remove(&selected_output) {
+                table.insert(branch.clone(), data);
             }
         }
 
-        // The row never moved, so land the cursor back on it (alt-x's reload reset
-        // it to the top).
-        let reposition_target = {
-            let items = self.items.lock().unwrap();
-            items
-                .iter()
-                .position(|item| item.output().as_ref() == selected_output)
-                .and_then(|pos| {
-                    let remaining = items.len().saturating_sub(PICKER_HEADER_ROWS);
-                    sticky_reposition_target(pos, remaining)
-                })
+        let repo = planning_repo.clone();
+        let approvals = Arc::clone(&self.approvals);
+        let render_tx = Arc::clone(&self.render_tx);
+        let stashed_warnings = Arc::clone(&self.stashed_warnings);
+        let shortcut_table = Arc::clone(&self.factory.shortcut_table);
+        let revert = MorphRevert {
+            rendered: slots.rendered,
+            original_rendered,
+            morphed: slots.morphed,
+            local_content: slots.local_content,
+            original_local,
+            shortcut_table,
+            branch_token: branch.clone(),
+            worktree_token: selected_output.clone(),
         };
-        if let Some(target) = reposition_target {
-            send_reposition(&self.render_tx, target);
+        let _ = std::thread::Builder::new()
+            .name(format!("picker-morph-{branch}"))
+            .spawn(move || {
+                if let Err(e) = Self::do_removal(&repo, &result, &approvals) {
+                    tracing::warn!(branch = %branch, error = %e, "picker: removal of '{branch}' worktree errored: {e:#}");
+                }
+                // Only the worktree removal can realistically fail here; if it did,
+                // the worktree dir survives — undo the morph and say so.
+                if removal_target_still_present(&repo, &result) {
+                    revert_morph(revert, &stashed_warnings, &render_tx);
+                }
+            });
+
+        // alt-x's reload reset the cursor to the top; land it back on the row,
+        // which is still in its original slot (morphed, not removed).
+        send_reposition(&self.render_tx, reposition_target);
+    }
+}
+
+/// The row's shared display slots plus the pre-rendered branch line a morph
+/// swaps in (see [`PickerCollector::morph_and_remove_in_background`]).
+struct MorphSlots {
+    rendered: Arc<Mutex<String>>,
+    morphed: Arc<AtomicBool>,
+    local_content: LocalContentSlot,
+    branch_line: String,
+    branch_local: LocalContent,
+}
+
+/// Everything the background thread needs to undo a morph when the worktree
+/// removal failed (see [`revert_morph`]).
+struct MorphRevert {
+    rendered: Arc<Mutex<String>>,
+    original_rendered: String,
+    morphed: Arc<AtomicBool>,
+    local_content: LocalContentSlot,
+    original_local: LocalContent,
+    shortcut_table: ShortcutTable,
+    /// The branch token the morph re-keyed the shortcut entry to.
+    branch_token: String,
+    /// The worktree-path token the entry is keyed under before (and after) morph.
+    worktree_token: String,
+}
+
+/// Build the `/ branch` row a kept-branch `alt-x` morph swaps in — the rendered
+/// line (on the picker's live `layout`, the same grid the worktree rows use) and
+/// the diff-content signals for its preview tabs.
+///
+/// Clones the worktree row's model and demotes it to a local branch: `kind` →
+/// `Branch` blanks the path and worktree-status columns and switches the gutter
+/// to `/`, while counts / age / message carry over unchanged (the branch keeps
+/// the worktree's HEAD). Status symbols are reset and recomputed for the branch
+/// kind — `refresh_status_symbols` only fills empty slots, so the worktree's must
+/// be cleared first. The [`LocalContent`] is read off the demoted item, so its
+/// `working_tree` signal resolves empty (no worktree to diff) and the
+/// `working_tree` preview tab dims. OSC 8 hyperlinks are stripped to match the
+/// rows the handler builds (skim's pipeline mangles them).
+fn build_morph_branch_row(
+    layout: &crate::commands::list::layout::LayoutConfig,
+    worktree_item: &ListItem,
+    default_branch: Option<&str>,
+) -> (String, LocalContent) {
+    let mut branch_item = worktree_item.clone();
+    branch_item.kind = ItemKind::Branch(BranchScope::Local);
+    branch_item.status_symbols = Default::default();
+    branch_item.refresh_status_symbols(default_branch);
+    let line = strip_osc8_hyperlinks(
+        &layout
+            .render_list_item_line(&branch_item, PLACEHOLDER)
+            .render(),
+    );
+    (line, LocalContent::from_item(&branch_item))
+}
+
+/// Undo a morph after the worktree removal failed, restoring the worktree row in
+/// place and explaining why it didn't go away.
+///
+/// The mirror of [`PickerCollector::morph_and_remove_in_background`]'s apply
+/// step: restore the row's pre-morph display, clear the
+/// [`morphed`](items::LocalCheckout::morphed) flag (so `output()` is the
+/// worktree token again), restore the diff-content slot, and move the
+/// `alt-y`/`alt-o` shortcut entry back to the worktree token. The row never left
+/// its slot, so a plain `Event::Render` repaints it — no reload, no cursor move
+/// (unlike [`restore_failed_removal`], which re-inserts a dropped row). The
+/// `kept … could not remove it` warning drains to stderr when the picker exits.
+fn revert_morph(
+    revert: MorphRevert,
+    stashed_warnings: &Mutex<Vec<String>>,
+    render_tx: &OnceLock<tokio::sync::mpsc::Sender<Event>>,
+) {
+    let MorphRevert {
+        rendered,
+        original_rendered,
+        morphed,
+        local_content,
+        original_local,
+        shortcut_table,
+        branch_token,
+        worktree_token,
+    } = revert;
+
+    *rendered.lock().unwrap() = original_rendered;
+    morphed.store(false, Ordering::Relaxed);
+    *local_content.lock().unwrap() = original_local;
+    {
+        let mut table = shortcut_table.lock().unwrap();
+        if let Some(data) = table.remove(&branch_token) {
+            table.insert(worktree_token, data);
         }
+    }
+
+    stashed_warnings.lock().unwrap().push(
+        warning_message(cformat!(
+            "Kept <bold>{branch_token}</> worktree — could not remove it"
+        ))
+        .to_string(),
+    );
+
+    if let Some(tx) = render_tx.get() {
+        let _ = tx.try_send(Event::Render);
     }
 }
 
@@ -569,30 +803,24 @@ const REPOSITION_SETTLED_RENDERS: usize = 3;
 /// guards against an unforeseen state where the matcher never settles.
 const REPOSITION_MAX_ATTEMPTS: usize = 1000;
 
-/// The `item_list` row the cursor should land on after an alt-x removal, given
-/// the removed row's position in `shared_items` (header included) and how many
-/// data rows remain.
+/// A skim `Custom` action that lands the cursor on the row whose `output()`
+/// token is `landing` once the reloaded item list is populated — or on the last
+/// row when `landing` is `None` or names a row the reload dropped.
 ///
-/// The removed row sat at `removed_pos`; the row that slides up into its slot is
-/// the next one, which lands at the same `item_list` index once the header is
-/// subtracted. Returns `None` when there's nothing to land on (the list is now
-/// header-only) or the position was the header itself. The caller clamps to the
-/// list's last row via `scroll_by`, so a removed-last-row target just overshoots
-/// and snaps back to the new last row.
-fn sticky_reposition_target(removed_pos: usize, remaining_data_rows: usize) -> Option<usize> {
-    if remaining_data_rows == 0 {
-        return None;
-    }
-    removed_pos.checked_sub(PICKER_HEADER_ROWS)
-}
-
-/// A skim `Custom` action that moves the cursor to `target` once the reloaded
-/// item list is populated.
+/// skim has no "select this item" action and resets the cursor to the top on
+/// reload, so this drives the move through `ItemList`'s public cursor API with
+/// `&mut App` in hand. It lands by **identity**, not by absolute index: a fuzzy
+/// query reorders and shrinks `item_list` relative to `shared_items`, so an
+/// index computed from a row's `shared_items` position would point at the wrong
+/// row (or past the filtered list's end) — the +N-row jump removals showed under
+/// an active query. Walking to the token is correct whether or not a query is
+/// live. `landing` is captured *before* the reload: the drop hands the token of
+/// the row displayed just below the removed one (see the `alt-x` binding), the
+/// keep / morph / restore paths the token of the row that stays or returns.
 ///
-/// skim has no "set cursor to index N" action and resets the cursor to the top
-/// on reload, so this drives the move through `ItemList`'s public cursor API
-/// with `&mut App` in hand: `jump_to_first` + `scroll_by(target)` lands on
-/// `target`, clamped to the last row.
+/// `None` (a removed *last* row, with no successor to slide up) and a token the
+/// reload dropped (also removed, or filtered out by the live query) both land on
+/// the new last row — for a removed last row, the row that was above it.
 ///
 /// The reload repopulates `item_list` asynchronously — the reader refills
 /// `item_pool`, then the matcher filters it into `item_list` — so the first
@@ -604,11 +832,6 @@ fn sticky_reposition_target(removed_pos: usize, remaining_data_rows: usize) -> O
 /// on. Sleeping instead of re-arming would hold `&mut App` across the await and
 /// starve the render that loads the rows.
 ///
-/// `target` is an `item_list` index (data rows only — see [`PICKER_HEADER_ROWS`])
-/// from [`sticky_reposition_target`]. Under an active fuzzy query the displayed
-/// order diverges from `shared_items` order, so the landing row is approximate
-/// (a valid nearby row) rather than the exact next row.
-///
 /// On landing, it returns [`Event::RunPreview`] so the preview pane repaints for
 /// the row the cursor settled on. skim only repaints the preview on a
 /// selection-*change* event (`on_selection_changed`), and moving the cursor
@@ -616,18 +839,34 @@ fn sticky_reposition_target(removed_pos: usize, remaining_data_rows: usize) -> O
 /// showing the row skim last previewed (the current worktree, which the reload
 /// briefly reset the cursor to) until the next keystroke.
 fn reposition_cursor_action(
-    target: usize,
+    landing: Option<String>,
     attempts: Arc<AtomicUsize>,
     settled_streak: Arc<AtomicUsize>,
 ) -> Action {
     Action::Custom(ActionCallback::new_sync(
         move |app| -> Result<Vec<Event>, Box<dyn std::error::Error + Send + Sync>> {
-            // Rows are in: land the cursor on the removed row's slot, then
+            // Rows are in: land the cursor on the target row by identity, then
             // repaint the preview for it (the cursor move alone doesn't).
-            if app.item_list.count() > 0 {
-                app.item_list.jump_to_first();
-                app.item_list
-                    .scroll_by(i32::try_from(target).unwrap_or(i32::MAX));
+            let count = app.item_list.count();
+            if count > 0 {
+                let mut landed = false;
+                if let Some(token) = landing.as_deref() {
+                    app.item_list.jump_to_first();
+                    for _ in 0..count {
+                        if app
+                            .item_list
+                            .selected()
+                            .is_some_and(|m| m.item.output().as_ref() == token)
+                        {
+                            landed = true;
+                            break;
+                        }
+                        app.item_list.select_next();
+                    }
+                }
+                if !landed {
+                    app.item_list.jump_to_last();
+                }
                 return Ok(vec![Event::RunPreview]);
             }
             // No rows yet. The matcher has "settled" once it has stopped with the
@@ -651,7 +890,7 @@ fn reposition_cursor_action(
                 return Ok(Vec::new());
             }
             Ok(vec![Event::Action(reposition_cursor_action(
-                target,
+                landing.clone(),
                 Arc::clone(&attempts),
                 Arc::clone(&settled_streak),
             ))])
@@ -659,13 +898,14 @@ fn reposition_cursor_action(
     ))
 }
 
-/// Inject a cursor reposition onto `target` through skim's event sender, with
-/// fresh attempt/streak counters (see [`reposition_cursor_action`]). The single
-/// path every alt-x outcome uses to move the cursor after its reload — the drop
-/// (cursor onto the slide-up row), the keep (back onto the row), and the restore
-/// (back onto the re-inserted row). A no-op before `render_tx` is set or once the
-/// receiver is gone (teardown); the queued action is dropped if the channel is
-/// full.
+/// Inject a cursor reposition onto the row whose `output()` token is `landing`
+/// through skim's event sender, with fresh attempt/streak counters (see
+/// [`reposition_cursor_action`]). `None` lands on the last row. The single path
+/// every alt-x outcome uses to move the cursor after its reload — the drop
+/// (cursor onto the row that slid up, captured before the reload), the keep /
+/// morph (back onto the row, which stays), and the restore (onto the re-inserted
+/// row). A no-op before `render_tx` is set or once the receiver is gone
+/// (teardown); the queued action is dropped if the channel is full.
 ///
 /// Rapid alt-r (or a background restore overtaking the optimistic drop) can leave
 /// more than one chain in flight. Each carries its own counters and self-terminates
@@ -674,10 +914,13 @@ fn reposition_cursor_action(
 /// render. Bounding this to only the newest reposition would take a generation
 /// token threaded through every chain (and every `PickerCollector` construction
 /// site); the self-correcting transient isn't worth that cross-chain state.
-fn send_reposition(render_tx: &OnceLock<tokio::sync::mpsc::Sender<Event>>, target: usize) {
+fn send_reposition(
+    render_tx: &OnceLock<tokio::sync::mpsc::Sender<Event>>,
+    landing: Option<String>,
+) {
     if let Some(event_tx) = render_tx.get() {
         let _ = event_tx.try_send(Event::Action(reposition_cursor_action(
-            target,
+            landing,
             Arc::new(AtomicUsize::new(0)),
             Arc::new(AtomicUsize::new(0)),
         )));
@@ -730,6 +973,64 @@ fn removal_will_remove_target(result: &RemoveResult) -> bool {
     }
 }
 
+/// Whether the row's target is the worktree the picker was launched from — the
+/// `changed_directory` flag `prepare_worktree_removal` sets when the removed
+/// worktree is the caller's own.
+///
+/// The picker declines this case (see [`PickerCollector::keep_current_worktree_row`]):
+/// removing the current worktree would have to cd the shell elsewhere first, and
+/// that switch drags in `post-switch` hooks streaming into the picker, an empty
+/// placeholder directory swapped under the cursor mid-render, and a directory
+/// change the picker can't cleanly reflect. Switching away (Enter) and then
+/// removing the now-non-current row is the clean path, so alt-x on the current
+/// worktree keeps the row and explains. `BranchOnly` rows have no worktree to be
+/// standing in, so this is always `false` for them.
+fn removal_targets_current_worktree(result: &RemoveResult) -> bool {
+    matches!(
+        result,
+        RemoveResult::RemovedWorktree {
+            changed_directory: true,
+            ..
+        }
+    )
+}
+
+/// The branch a `RemovedWorktree` removal will **keep** — worktree gone, branch
+/// retained — or `None` if the removal will delete the branch (or there's no
+/// branch). Drives the `alt-x` in-place morph: a kept branch turns the row into
+/// a `/ branch` row rather than dropping it.
+///
+/// Mirrors [`delete_branch_if_safe`] exactly so the prediction can't drift from
+/// the deletion the background `do_removal` performs: force always deletes; a
+/// `Keep` flag always retains; otherwise the branch is kept precisely when it is
+/// **not** integrated into the same `target_branch.unwrap_or("HEAD")` the actual
+/// delete checks (`Repository::integration_reason` → `None`). A `capture_refs`
+/// or integration error yields `None` (fall back to the drop path) — never a
+/// morph the removal won't back up. Runs a couple of git commands on skim's
+/// event loop, like `prepare_removal`'s own validation.
+fn worktree_removal_keeps_branch(repo: &Repository, result: &RemoveResult) -> Option<String> {
+    let RemoveResult::RemovedWorktree {
+        branch_name: Some(branch),
+        deletion_mode,
+        target_branch,
+        ..
+    } = result
+    else {
+        return None;
+    };
+    if deletion_mode.is_force() {
+        return None; // `-D` deletes regardless of integration.
+    }
+    if deletion_mode.should_keep() {
+        return Some(branch.clone()); // `Keep` retains regardless of integration.
+    }
+    // SafeDelete: kept iff unmerged — the exact check `delete_branch_if_safe` runs.
+    let snapshot = repo.capture_refs().ok()?;
+    let target = target_branch.as_deref().unwrap_or("HEAD");
+    let (_, reason) = repo.integration_reason(&snapshot, branch, target).ok()?;
+    reason.is_none().then(|| branch.clone())
+}
+
 /// Whether the row's underlying target still exists after `do_removal` ran — the
 /// primary evidence for "was this actually removed," used in place of inferring
 /// from `do_removal`'s `Result`.
@@ -743,12 +1044,52 @@ fn removal_will_remove_target(result: &RemoveResult) -> bool {
 /// it.) Observing the target directly handles both: the worktree dir is gone once
 /// removed (renamed into `.git/wt/trash/`), and the branch ref is gone once
 /// deleted. The check runs on the background thread, off skim's event loop.
+///
+/// `worktree_path.exists()` is the right signal here because the picker only ever
+/// removes *non-current* worktrees — [`removal_targets_current_worktree`] keeps the
+/// current one in place rather than removing it. So no empty placeholder directory
+/// is ever left at `worktree_path` (that placeholder, which keeps `$PWD` valid, is
+/// created only when removing the worktree the shell is sitting in — see
+/// [`crate::output::handlers`]). A successful removal renames the whole tree away;
+/// a failed one leaves it intact.
 fn removal_target_still_present(repo: &Repository, result: &RemoveResult) -> bool {
     match result {
         RemoveResult::RemovedWorktree { worktree_path, .. } => worktree_path.exists(),
         RemoveResult::BranchOnly { branch_name, .. } => {
             repo.branch(branch_name).exists_locally().unwrap_or(false)
         }
+    }
+}
+
+/// Stash the canonical "retained; unmerged" info + hint pair (deduped), drained
+/// to stderr once the picker releases the terminal. Used by
+/// [`PickerCollector::keep_unremovable_row`] — a branch-only row whose unmerged
+/// branch `SafeDelete` declines to delete stays put, and this explains the
+/// no-op. (A worktree removal that keeps its branch instead transforms the row
+/// to `/ branch` live — see [`PickerCollector::drop_and_remove_in_background`] —
+/// so it needs no stashed message.) The pair is the one `wt remove` itself
+/// prints — see [`crate::output::retained_unmerged_branch_messages`].
+fn stash_retained_unmerged_branch(stashed: &Mutex<Vec<String>>, branch_name: &str) {
+    let (info, hint) = crate::output::retained_unmerged_branch_messages(branch_name);
+    let mut stashed = stashed.lock().unwrap();
+    if !stashed.contains(&info) {
+        stashed.push(info);
+        stashed.push(hint);
+    }
+}
+
+/// Stash the "can't remove the current worktree here" info + hint pair (deduped),
+/// drained to stderr once the picker releases the terminal. Used by
+/// [`PickerCollector::keep_current_worktree_row`] — alt-x on the worktree the
+/// picker was launched from keeps the row and explains, since removing it would
+/// have to switch the shell elsewhere first.
+fn stash_current_worktree_hint(stashed: &Mutex<Vec<String>>) {
+    let info = info_message("Can't remove the current worktree from the picker").to_string();
+    let hint = hint_message("Switch to another worktree first").to_string();
+    let mut stashed = stashed.lock().unwrap();
+    if !stashed.contains(&info) {
+        stashed.push(info);
+        stashed.push(hint);
     }
 }
 
@@ -792,8 +1133,9 @@ fn restore_failed_removal(
         // Another removal may have shrunk the list since the drop; clamp.
         let insert_at = removed_pos.min(items.len());
         items.insert(insert_at, removed_item);
-        let remaining_data_rows = items.len().saturating_sub(PICKER_HEADER_ROWS);
-        sticky_reposition_target(insert_at, remaining_data_rows)
+        // Land the cursor back on the restored row by its token — identity, not a
+        // `shared_items` index, so it's right even with a query reordering the list.
+        Some(token)
     };
 
     stashed_warnings.lock().unwrap().push(
@@ -808,9 +1150,7 @@ fn restore_failed_removal(
     };
     // Re-stream the restored list, then land the cursor back on the row.
     let _ = event_tx.try_send(Event::Reload("restore".to_string()));
-    if let Some(target) = reposition_target {
-        send_reposition(render_tx, target);
-    }
+    send_reposition(render_tx, reposition_target);
 }
 
 impl CommandCollector for PickerCollector {
@@ -846,13 +1186,30 @@ impl CommandCollector for PickerCollector {
 
                 match preparation {
                     Ok((planning_repo, result)) => {
-                        // Decide up front, from the already-computed result, whether
-                        // this removal will actually remove the target. Only an
-                        // outcome that removes drops the row; a branch-only row whose
-                        // branch is unmerged stays put and is explained, so the list
-                        // never flickers a row off and back on (see
-                        // `removal_will_remove_target`).
-                        if removal_will_remove_target(&result) {
+                        // Decide up front, from the already-computed result, what
+                        // this removal does to the row:
+                        //   - targets the current worktree → keep it; removing the
+                        //     worktree you're standing in has to switch you away
+                        //     first, which the picker declines (no row drop);
+                        //   - keeps its (unmerged) branch → morph to `/ branch` in
+                        //     place (worktree gone, branch stays) — no row drop;
+                        //   - removes the target → drop the row;
+                        //   - branch-only row whose branch is unmerged → stays put,
+                        //     explained, so the list never flickers a row off and on.
+                        // See `removal_targets_current_worktree` /
+                        // `worktree_removal_keeps_branch` / `removal_will_remove_target`.
+                        if removal_targets_current_worktree(&result) {
+                            self.keep_current_worktree_row(&selected_output);
+                        } else if let Some(branch) =
+                            worktree_removal_keeps_branch(&planning_repo, &result)
+                        {
+                            self.morph_and_remove_in_background(
+                                selected_output,
+                                branch,
+                                planning_repo,
+                                result,
+                            );
+                        } else if removal_will_remove_target(&result) {
                             self.drop_and_remove_in_background(
                                 selected_output,
                                 planning_repo,
@@ -869,6 +1226,18 @@ impl CommandCollector for PickerCollector {
                     }
                     Err(e) => {
                         tracing::info!(selected_output = %selected_output, error = %e, "picker: cannot remove '{selected_output}': {e:#}");
+                        // The target can't be removed — the main worktree, a dirty
+                        // worktree, a lock. Surface the *same* diagnostic `wt remove`
+                        // prints (drained to stderr on exit) instead of swallowing
+                        // it, so alt-x isn't a silent dead keypress. Nothing was
+                        // removed, so the row stays; re-anchor the cursor on it.
+                        if let Some(diagnostic) = e.render_diagnostic() {
+                            let mut stashed = self.stashed_warnings.lock().unwrap();
+                            if !stashed.contains(&diagnostic) {
+                                stashed.push(diagnostic);
+                            }
+                        }
+                        self.reposition_to_kept_row(&selected_output);
                     }
                 }
             }
@@ -942,6 +1311,10 @@ struct PipelineFactory {
     preview_cache: PreviewCache,
     orchestrator: Arc<PreviewOrchestrator>,
     stashed_warnings: Arc<Mutex<Vec<String>>>,
+    /// Handoff of the collect layout to the collector, for rendering a
+    /// `/ branch` row on the same grid at `alt-x` time. Filled by the handler's
+    /// `provide_layout`, read by [`PickerCollector`]. See [`items::LayoutSlot`].
+    layout_slot: items::LayoutSlot,
     preview_dims: (usize, usize),
     skim_list_width: usize,
     command_timeout: Option<std::time::Duration>,
@@ -978,6 +1351,10 @@ impl PipelineFactory {
     /// yet, so reusing it is correct and avoids re-paying `git worktree list` /
     /// `local_branches` on the first-paint hot path (doubling them there slows
     /// the picker, worst on Windows).
+    ///
+    /// The rebuild is also what lets `alt-r` drop a worktree an in-picker `alt-x`
+    /// removed: re-enumerating from a fresh handle skips the gone worktree, where
+    /// the startup cache would still list it.
     fn spawn(&self, rebuild_repo: bool) -> anyhow::Result<SpawnedPipeline> {
         let (tx, rx): (SkimItemSender, SkimItemReceiver) = unbounded();
 
@@ -1034,6 +1411,7 @@ impl PipelineFactory {
                 stashed_warnings: Arc::clone(&self.stashed_warnings),
                 deferred_items: OnceLock::new(),
                 grid_slot: Arc::clone(&grid_slot),
+                layout_slot: Arc::clone(&self.layout_slot),
                 prs_loading: prs_loading.clone(),
             });
 
@@ -1358,6 +1736,9 @@ pub fn handle_picker(
         preview_cache: Arc::clone(&preview_cache),
         orchestrator: Arc::clone(&orchestrator),
         stashed_warnings: Arc::clone(&stashed_warnings),
+        // Full-layout handoff: the handler fills it in `provide_layout`, the
+        // collector reads it to render the `alt-x` `/ branch` row on this grid.
+        layout_slot: Arc::new(Mutex::new(None)),
         preview_dims,
         skim_list_width,
         command_timeout,
@@ -1370,6 +1751,11 @@ pub fn handle_picker(
         is_preview_bench,
     });
 
+    // Carries the drop's landing-row token from the `alt-x` keybinding (which sees
+    // skim's `App`, pre-reload) to the collector's `invoke` (reader thread,
+    // post-reload). See the `drop_landing` field and the `alt-x` bind below.
+    let drop_landing: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+
     let collector = PickerCollector {
         items: Arc::clone(&shared_items),
         repo: repo.clone(),
@@ -1377,6 +1763,7 @@ pub fn handle_picker(
         render_tx: Arc::clone(&render_tx),
         factory: Rc::clone(&factory),
         stashed_warnings: Arc::clone(&stashed_warnings),
+        drop_landing: Arc::clone(&drop_landing),
     };
 
     // Half-page preview scroll: half of skim's usable height.
@@ -1444,8 +1831,7 @@ pub fn handle_picker(
         // (or `--prs`) list scrolls with no position cue, made worse by
         // `no_info(true)` below hiding the matched/total counter.
         .scrollbar("▐".to_string())
-        // First line (header) non-selectable. `PICKER_HEADER_ROWS` mirrors this
-        // count so the alt-x cursor-reposition math stays in sync — keep them one.
+        // First line (header) non-selectable; `PICKER_HEADER_ROWS` names the count.
         .header_lines(PICKER_HEADER_ROWS)
         .multi(false)
         // The table is laid out at full terminal width (see `skim_list_width`
@@ -1486,18 +1872,10 @@ pub fn handle_picker(
             //
             // Create new worktree with query as branch name (alt-c for "create")
             "alt-c:accept(create)".to_string(),
-            // Remove selected worktree: `reload(remove {})` hands the selected
-            // row's output() token to PickerCollector, which performs the removal
-            // and streams updated items back — all without leaving the picker.
-            // Passing the token through the reload cmd (not an execute-silent +
-            // file write) sidesteps skim 4.x's fire-and-forget execute-silent,
-            // which raced the reader and removed nothing. The collector also
-            // re-positions the cursor onto the removed row's slot afterward —
-            // reload otherwise snaps it back to the top (see PickerCollector).
-            // alt-x for "remove" — alt-r is the refresh key (below), and putting
-            // the destructive action on a less-reflexive key guards against a
-            // mis-hit, the safe direction being a stray refresh.
-            "alt-x:reload(remove {})".to_string(),
+            // alt-x (remove) is installed natively below via
+            // `install_remove_keybinding` — it pairs a Custom callback (capture the
+            // landing row off skim's `App` before the reload resets the cursor)
+            // with `reload(remove {})`, which a string bind can't express.
             // Refresh the list (alt-r for "refresh"): `reload(refresh)` re-runs
             // collect through PickerCollector, picking up worktrees/branches
             // created outside the session (a teammate's push, a parallel agent)
@@ -1531,6 +1909,10 @@ pub fn handle_picker(
     // that read the selected row off skim's `App` and run the OS action on a
     // background thread. Like the preview-tab keys, they can't be string binds.
     install_shortcut_keybindings(&mut options.keymap, Arc::clone(&shortcut_table));
+    // alt-x (remove): a Custom callback that captures the would-be landing row
+    // off skim's `App`, then `reload(remove {})` — the same removal path as a
+    // string bind, fronted by the pre-reload capture a string bind can't run.
+    install_remove_keybinding(&mut options.keymap, Arc::clone(&drop_landing));
     worktrunk::trace::instant("Picker skim options built");
 
     // Spawn the collect pipeline (and the `--prs` thread when active). The
@@ -1803,6 +2185,60 @@ fn install_shortcut_keybindings(keymap: &mut skim::binds::KeyMap, shortcut_table
     }
 }
 
+/// Install `alt-x` (remove the selected row) as a native binding: a Custom
+/// callback that captures the drop's landing row, paired with `reload(remove {})`.
+///
+/// The capture has to run *before* the reload, which resets the cursor to the top.
+/// A drop's reposition needs to know which row should take the removed row's slot
+/// — the row displayed just below it — and only the live `App` knows skim's
+/// displayed order (a fuzzy query reorders and shrinks `item_list` relative to
+/// `shared_items`, so a `shared_items` index lands +N rows off). The callback
+/// peeks that neighbor, stashes its `output()` token in `drop_landing`, and the
+/// collector's drop path lands the cursor on it by identity. `None` means the
+/// selected row was last (no successor → land on the new last row).
+///
+/// skim runs a key's bound actions in order, so the callback restores the cursor
+/// to the selected row before `reload(remove {})` expands `{}` against it — the
+/// same removal the old string bind ran, fronted by a capture a string bind can't
+/// express (like the preview-tab and row shortcuts, hence a native keymap insert).
+fn install_remove_keybinding(
+    keymap: &mut skim::binds::KeyMap,
+    drop_landing: Arc<Mutex<Option<String>>>,
+) {
+    use skim::binds::parse_key;
+    let Ok(key) = parse_key("alt-x") else {
+        return;
+    };
+    let capture = Action::Custom(ActionCallback::new_sync(move |app| {
+        // Peek the row just below the selected one by stepping the cursor down and
+        // back. A clamp (the cursor doesn't move, so the peeked token equals the
+        // selected one) means the selected row is last — no successor, `None`. Any
+        // real move is restored so the paired `reload(remove {})` still expands
+        // `{}` against the selected row.
+        let landing = app.item_list.selected().and_then(|selected| {
+            let selected_token = selected.item.output().into_owned();
+            app.item_list.select_next();
+            let below = app
+                .item_list
+                .selected()
+                .map(|m| m.item.output().into_owned());
+            match below {
+                Some(token) if token != selected_token => {
+                    app.item_list.select_previous();
+                    Some(token)
+                }
+                _ => None,
+            }
+        });
+        *drop_landing.lock().unwrap() = landing;
+        Ok(Vec::new())
+    }));
+    keymap.insert(
+        key,
+        vec![capture, Action::Reload(Some("remove {}".to_string()))],
+    );
+}
+
 /// Run a row shortcut's OS action on a named background thread, logging any
 /// failure — the picker owns the terminal, so an error can't be shown inline.
 fn spawn_shortcut<F>(name: &str, action: F)
@@ -1907,7 +2343,7 @@ pub mod tests {
         install_preview_tab_keybindings, install_shortcut_keybindings, parse_reload_remove_token,
         picker_item_identifier, resolve_identifier, resolve_shortcut_branch, resolve_shortcut_url,
     };
-    use crate::commands::list::model::{ItemKind, ListItem, WorktreeData};
+    use crate::commands::list::model::{BranchScope, ItemKind, ListItem, WorktreeData};
     use crate::commands::worktree::RemoveResult;
     use skim::prelude::SkimItem;
     use skim::reader::CommandCollector;
@@ -2011,6 +2447,7 @@ pub mod tests {
                 RowShortcutData {
                     branch: Some("feat".into()),
                     url: RowUrl::Static(Some("https://example.test/pr/1".into())),
+                    morph: None,
                 },
             );
             t.insert(
@@ -2018,6 +2455,7 @@ pub mod tests {
                 RowShortcutData {
                     branch: None,
                     url: RowUrl::Static(None),
+                    morph: None,
                 },
             );
         }
@@ -2088,26 +2526,6 @@ pub mod tests {
         assert_eq!(parse_reload_remove_token("remove plain"), "plain");
     }
 
-    /// `sticky_reposition_target` maps a removed row's `shared_items` position
-    /// (header at index 0) to the `item_list` index the cursor should land on —
-    /// the data-row index of the slot the removed row vacated. It declines when
-    /// the list is now header-only (nothing to land on); `scroll_by` clamps the
-    /// removed-last-row overshoot, so the helper itself never caps the target.
-    #[test]
-    fn test_sticky_reposition_target() {
-        // First data row (shared_items index 1) → item_list index 0.
-        assert_eq!(super::sticky_reposition_target(1, 3), Some(0));
-        // Third data row (index 3) → item_list index 2, with rows remaining.
-        assert_eq!(super::sticky_reposition_target(3, 2), Some(2));
-        // Removed the only data row → header-only list, nothing to land on.
-        assert_eq!(super::sticky_reposition_target(1, 0), None);
-        // The header position itself never repositions.
-        assert_eq!(super::sticky_reposition_target(0, 2), None);
-        // Removed-last-row target may exceed the remaining rows; the helper
-        // returns it verbatim and leaves clamping to `scroll_by`.
-        assert_eq!(super::sticky_reposition_target(4, 3), Some(3));
-    }
-
     /// `send_reposition` (the single path the drop/keep/restore cursor moves
     /// share) queues an `Event::Action` through skim's sender when the TUI is up,
     /// and is a no-op before the sender is set.
@@ -2117,7 +2535,7 @@ pub mod tests {
         let (tx, mut rx) = tokio::sync::mpsc::channel(4);
         render_tx.set(tx).unwrap();
 
-        super::send_reposition(&render_tx, 2);
+        super::send_reposition(&render_tx, Some("worktree-path:/tmp/wt".to_string()));
         assert!(
             matches!(rx.try_recv(), Ok(skim::prelude::Event::Action(_))),
             "a set sender receives a reposition Action"
@@ -2125,7 +2543,7 @@ pub mod tests {
 
         // No sender set → no panic, nothing emitted.
         let empty: OnceLock<tokio::sync::mpsc::Sender<skim::prelude::Event>> = OnceLock::new();
-        super::send_reposition(&empty, 0);
+        super::send_reposition(&empty, None);
     }
 
     /// `from_signal` rejects tokens that carry no usable target: a blank or
@@ -2408,6 +2826,7 @@ pub mod tests {
                 has_upstream: false,
                 summaries_enabled: false,
                 local_content: Arc::new(Mutex::new(LocalContent::default())),
+                morphed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             }),
         }) as Arc<dyn SkimItem>
     }
@@ -2442,6 +2861,78 @@ pub mod tests {
         )
     }
 
+    /// Build a morphable worktree row and register everything `invoke`'s morph
+    /// path needs — a [`MorphHandle`](items::MorphHandle) in the factory's
+    /// shortcut table, keyed by the row's `output()` token, and a real layout in
+    /// its slot — so a kept-branch removal morphs in place instead of falling back
+    /// to a drop. Returns the row, its token, and the shared `rendered` / `morphed`
+    /// slots the morph mutates (so a test can assert on them).
+    fn setup_morphable_row(
+        factory: &std::rc::Rc<super::PipelineFactory>,
+        branch: &str,
+        path: &Path,
+    ) -> (
+        Arc<dyn SkimItem>,
+        String,
+        Arc<Mutex<String>>,
+        Arc<std::sync::atomic::AtomicBool>,
+    ) {
+        let mut item = ListItem::new_branch("abc123".to_string(), branch.to_string());
+        item.kind = ItemKind::Worktree(Box::new(WorktreeData {
+            path: path.to_path_buf(),
+            ..Default::default()
+        }));
+        let item_arc = Arc::new(item);
+        let rendered = Arc::new(Mutex::new(format!("+ {branch}")));
+        let local_content = Arc::new(Mutex::new(LocalContent::default()));
+        let morphed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let row: Arc<dyn SkimItem> = Arc::new(PickerRow {
+            search_base: branch.to_string(),
+            gutter: '+',
+            rendered: Arc::clone(&rendered),
+            branch_name: branch.to_string(),
+            output_token: worktree_output_token(&item_arc, branch),
+            preview_cache: Arc::new(dashmap::DashMap::new()),
+            pr_status: Arc::new(Mutex::new(None)),
+            notifier: super::preview_notify::PreviewNotifier::detached(),
+            local: Some(LocalCheckout {
+                has_upstream: false,
+                summaries_enabled: false,
+                local_content: Arc::clone(&local_content),
+                morphed: Arc::clone(&morphed),
+            }),
+        });
+        let token = row.output().to_string();
+
+        factory.shortcut_table.lock().unwrap().insert(
+            token.clone(),
+            super::items::RowShortcutData {
+                branch: Some(branch.to_string()),
+                url: super::items::RowUrl::Static(None),
+                morph: Some(super::items::MorphHandle {
+                    item: Arc::clone(&item_arc),
+                    rendered: Arc::clone(&rendered),
+                    local_content,
+                    morphed: Arc::clone(&morphed),
+                }),
+            },
+        );
+        *factory.layout_slot.lock().unwrap() =
+            Some(crate::commands::list::layout::calculate_layout_with_width(
+                std::slice::from_ref(&*item_arc),
+                &std::collections::HashSet::new(),
+                80,
+                Path::new("/test"),
+                None,
+                None,
+                crate::commands::list::layout::ColumnSelection {
+                    custom: &[],
+                    selected: None,
+                },
+            ));
+        (row, token, rendered, morphed)
+    }
+
     /// A real [`PipelineFactory`] with empty config for the removal / `invoke`
     /// tests. Its `spawn()` is only reached by the refresh verb, which these
     /// tests don't exercise, so the minimal field set is enough to satisfy the
@@ -2461,6 +2952,7 @@ pub mod tests {
             preview_cache,
             orchestrator,
             stashed_warnings: Arc::new(Mutex::new(Vec::new())),
+            layout_slot: Arc::new(Mutex::new(None)),
             preview_dims: (80, 24),
             skim_list_width: 80,
             command_timeout: None,
@@ -2490,6 +2982,7 @@ pub mod tests {
             render_tx: Arc::new(OnceLock::new()),
             factory,
             stashed_warnings,
+            drop_landing: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -2881,6 +3374,7 @@ pub mod tests {
             approvals: Arc::new(approvals),
             render_tx: Arc::new(OnceLock::new()),
             stashed_warnings: Arc::clone(&stashed),
+            drop_landing: Arc::new(Mutex::new(None)),
         };
 
         let cmd = format!("remove '{token}'");
@@ -2916,9 +3410,273 @@ pub mod tests {
         );
     }
 
-    /// `removal_target_still_present` observes reality: a worktree dir or a
-    /// branch ref that's gone reads as removed; one still on disk / in the
-    /// ref store reads as present (the restore trigger).
+    /// End-to-end through `invoke`: alt-x on a worktree whose branch is unmerged
+    /// morphs the row to `/ branch` in place. The worktree is removed but the
+    /// branch is kept (`SafeDelete` won't delete unmerged work), and the row
+    /// never leaves its slot — its `morphed` flag flips, its `output()` becomes
+    /// the bare branch token, and its display line is rewritten (no longer the
+    /// `+ worktree` line). The morph is applied synchronously in `invoke`; only
+    /// the git removal runs on the background thread.
+    #[test]
+    fn test_invoke_morphs_unmerged_worktree_to_branch_row() {
+        use std::sync::atomic::Ordering;
+
+        let test = worktrunk::testing::TestRepo::with_initial_commit();
+        let repo = worktrunk::git::Repository::at(test.path()).unwrap();
+        let wt_dir = tempfile::tempdir().unwrap();
+        let wt_path = wt_dir.path().join("feature");
+        repo.run_command(&[
+            "worktree",
+            "add",
+            "-b",
+            "feature",
+            wt_path.to_str().unwrap(),
+        ])
+        .unwrap();
+
+        // Make `feature` unmerged: a commit on it that main doesn't have, so
+        // SafeDelete retains the branch when the worktree is removed.
+        fs::write(wt_path.join("new.txt"), "unmerged work").unwrap();
+        worktrunk::shell_exec::Cmd::new("git")
+            .args(["add", "."])
+            .current_dir(&wt_path)
+            .run()
+            .unwrap();
+        worktrunk::shell_exec::Cmd::new("git")
+            .args(["commit", "-m", "unmerged work"])
+            .current_dir(&wt_path)
+            .run()
+            .unwrap();
+
+        // Build the row from the git-reported path (macOS resolves the
+        // `/var`→`/private/var` symlink, which `prepare_removal`'s lookup matches).
+        let reported_path = repo
+            .list_worktrees()
+            .unwrap()
+            .iter()
+            .find(|wt| wt.branch.as_deref() == Some("feature"))
+            .map(|wt| wt.path.clone())
+            .expect("feature worktree is listed");
+        let items = Arc::new(Mutex::new(Vec::new()));
+        let mut collector = test_collector(Arc::clone(&items), repo.clone());
+        let (row, token, rendered, morphed) =
+            setup_morphable_row(&collector.factory, "feature", &reported_path);
+        items.lock().unwrap().push(Arc::clone(&row));
+        let original_line = rendered.lock().unwrap().clone();
+
+        let cmd = format!("remove '{token}'");
+        let (_rx, _interrupt) = collector.invoke(&cmd, Arc::new(AtomicUsize::new(0)));
+
+        // The morph is synchronous, so it's already applied when `invoke` returns:
+        // the row is now a branch row in place — flag flipped, token rebranded,
+        // line rewritten.
+        assert!(
+            morphed.load(Ordering::Relaxed),
+            "the kept-branch worktree row is morphed to a branch row"
+        );
+        assert_eq!(
+            row.output().as_ref(),
+            "feature",
+            "the morphed row's selection token is the bare branch name"
+        );
+        assert_ne!(
+            *rendered.lock().unwrap(),
+            original_line,
+            "the morphed row's display line is rewritten to the `/ branch` line"
+        );
+
+        // The worktree removal itself runs in the background.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while reported_path.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!reported_path.exists(), "the worktree is removed");
+        let branch_list = repo.run_command(&["branch", "--list", "feature"]).unwrap();
+        assert!(
+            !branch_list.is_empty(),
+            "the unmerged branch is retained after its worktree is removed"
+        );
+        // The removal succeeded, so the morph stands (no revert).
+        assert!(
+            morphed.load(Ordering::Relaxed),
+            "a successful removal leaves the row morphed"
+        );
+    }
+
+    /// The negative of the above, end-to-end through `invoke`: alt-x on a worktree
+    /// whose branch is *integrated* deletes both the worktree and the branch, so
+    /// there's no branch to keep — the row drops (it's removed from the list)
+    /// rather than morphing. `worktree_removal_keeps_branch` returns `None`, so the
+    /// drop path runs, not the morph. Guards against morphing (and resurrecting) a
+    /// row whose branch is actually gone.
+    #[test]
+    fn test_invoke_drops_integrated_worktree_row() {
+        let test = worktrunk::testing::TestRepo::with_initial_commit();
+        let repo = worktrunk::git::Repository::at(test.path()).unwrap();
+        let wt_dir = tempfile::tempdir().unwrap();
+        let wt_path = wt_dir.path().join("feature");
+        // No extra commit → `feature` sits at main's commit (integrated), so
+        // SafeDelete deletes the branch along with the worktree.
+        repo.run_command(&[
+            "worktree",
+            "add",
+            "-b",
+            "feature",
+            wt_path.to_str().unwrap(),
+        ])
+        .unwrap();
+
+        let reported_path = repo
+            .list_worktrees()
+            .unwrap()
+            .iter()
+            .find(|wt| wt.branch.as_deref() == Some("feature"))
+            .map(|wt| wt.path.clone())
+            .expect("feature worktree is listed");
+        let item = branched_picker_item("feature", &reported_path);
+        let token = item.output().to_string();
+        let items = Arc::new(Mutex::new(vec![Arc::clone(&item)]));
+        let mut collector = test_collector(Arc::clone(&items), repo.clone());
+
+        let cmd = format!("remove '{token}'");
+        let (_rx, _interrupt) = collector.invoke(&cmd, Arc::new(AtomicUsize::new(0)));
+
+        // The drop is synchronous (the row is removed before the background git
+        // work), so the list is already empty when `invoke` returns.
+        assert!(
+            items.lock().unwrap().is_empty(),
+            "the integrated worktree row drops instead of morphing"
+        );
+
+        // The background removal deletes both the worktree and the branch.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !repo
+            .run_command(&["branch", "--list", "feature"])
+            .unwrap()
+            .is_empty()
+            && Instant::now() < deadline
+        {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!reported_path.exists(), "the worktree is removed");
+        assert!(
+            repo.run_command(&["branch", "--list", "feature"])
+                .unwrap()
+                .is_empty(),
+            "the integrated branch is deleted (nothing to keep)"
+        );
+    }
+
+    /// `worktree_removal_keeps_branch` predicts the morph: a `RemovedWorktree`
+    /// whose `SafeDelete` would retain the branch (unmerged) yields the branch
+    /// name; an integrated one (deletes the branch) and a force-delete both yield
+    /// `None`. Built from real refs so the prediction runs the same
+    /// `integration_reason` the actual delete does.
+    #[test]
+    fn test_worktree_removal_keeps_branch() {
+        let test = worktrunk::testing::TestRepo::with_initial_commit();
+        let repo = worktrunk::git::Repository::at(test.path()).unwrap();
+        repo.run_command(&["branch", "integrated"]).unwrap();
+        // `unmerged` carries a commit main lacks.
+        repo.run_command(&["checkout", "-b", "unmerged"]).unwrap();
+        fs::write(test.path().join("new.txt"), "work").unwrap();
+        repo.run_command(&["add", "."]).unwrap();
+        repo.run_command(&["commit", "-m", "work"]).unwrap();
+        repo.run_command(&["checkout", "main"]).unwrap();
+
+        let result = |branch: &str, mode| RemoveResult::RemovedWorktree {
+            main_path: test.path().to_path_buf(),
+            worktree_path: test.path().join("gone"),
+            changed_directory: false,
+            branch_name: Some(branch.to_string()),
+            deletion_mode: mode,
+            target_branch: Some("main".to_string()),
+            force_worktree: false,
+            expected_path: None,
+            removed_commit: None,
+        };
+
+        assert_eq!(
+            super::worktree_removal_keeps_branch(
+                &repo,
+                &result("unmerged", BranchDeletionMode::SafeDelete)
+            )
+            .as_deref(),
+            Some("unmerged"),
+            "an unmerged branch is kept, so the row morphs"
+        );
+        assert_eq!(
+            super::worktree_removal_keeps_branch(
+                &repo,
+                &result("integrated", BranchDeletionMode::SafeDelete)
+            ),
+            None,
+            "an integrated branch is deleted, so the row drops"
+        );
+        assert_eq!(
+            super::worktree_removal_keeps_branch(
+                &repo,
+                &result("unmerged", BranchDeletionMode::ForceDelete)
+            ),
+            None,
+            "force-delete removes even an unmerged branch, so the row drops"
+        );
+    }
+
+    /// `build_morph_branch_row` renders the `/ branch` line a morph swaps in: the
+    /// worktree row's model demoted to a local branch on the live layout — gutter
+    /// `/`, no path — and a `LocalContent` whose `working_tree` reads empty (no
+    /// worktree to diff), which dims the `working_tree` preview tab.
+    #[test]
+    fn test_build_morph_branch_row() {
+        use ansi_str::AnsiStr;
+
+        let mut worktree_item = ListItem::new_branch("abc123".to_string(), "feature".to_string());
+        worktree_item.kind = ItemKind::Worktree(Box::new(WorktreeData {
+            path: Path::new("/tmp/wt.feature").to_path_buf(),
+            ..Default::default()
+        }));
+        let layout = crate::commands::list::layout::calculate_layout_with_width(
+            std::slice::from_ref(&worktree_item),
+            &std::collections::HashSet::new(),
+            80,
+            Path::new("/test"),
+            None,
+            None,
+            crate::commands::list::layout::ColumnSelection {
+                custom: &[],
+                selected: None,
+            },
+        );
+
+        let (line, local) = super::build_morph_branch_row(&layout, &worktree_item, Some("main"));
+        let plain = line.ansi_strip();
+        assert!(
+            plain.trim_start().starts_with('/'),
+            "the morphed line leads with the local-branch gutter `/`: {plain:?}"
+        );
+        assert!(
+            plain.contains("feature"),
+            "the morphed line shows the branch name: {plain:?}"
+        );
+        assert!(
+            !plain.contains("/tmp/wt.feature"),
+            "the morphed branch row has no worktree path: {plain:?}"
+        );
+        assert_eq!(
+            local,
+            LocalContent::from_item(&{
+                let mut b = ListItem::new_branch("abc123".to_string(), "feature".to_string());
+                b.kind = ItemKind::Branch(BranchScope::Local);
+                b
+            }),
+            "the morphed row's diff signals are the branch's (working_tree empty)"
+        );
+    }
+
+    /// `removal_target_still_present` observes reality: a worktree dir or a branch
+    /// ref that's gone reads as removed; one still on disk / in the ref store reads
+    /// as present (the restore trigger).
     #[test]
     fn test_removal_target_still_present() {
         let test = worktrunk::testing::TestRepo::with_initial_commit();
@@ -2937,7 +3695,7 @@ pub mod tests {
         };
         assert!(super::removal_target_still_present(
             &repo,
-            &worktree_result(test.path().to_path_buf()) // exists
+            &worktree_result(test.path().to_path_buf()) // still on disk
         ));
         assert!(!super::removal_target_still_present(
             &repo,
@@ -3023,6 +3781,128 @@ pub mod tests {
         );
     }
 
+    /// `removal_targets_current_worktree` fires only for a `RemovedWorktree` whose
+    /// `changed_directory` flag is set (the worktree the picker was launched from);
+    /// a non-current worktree and any `BranchOnly` row read as `false`.
+    #[test]
+    fn test_removal_targets_current_worktree() {
+        let path = std::path::PathBuf::from("/repo.feature");
+        let worktree = |changed_directory| RemoveResult::RemovedWorktree {
+            main_path: std::path::PathBuf::from("/repo"),
+            worktree_path: path.clone(),
+            changed_directory,
+            branch_name: Some("feature".to_string()),
+            deletion_mode: BranchDeletionMode::SafeDelete,
+            target_branch: Some("main".to_string()),
+            force_worktree: false,
+            expected_path: None,
+            removed_commit: None,
+        };
+        assert!(
+            super::removal_targets_current_worktree(&worktree(true)),
+            "removing the worktree the picker was launched from"
+        );
+        assert!(
+            !super::removal_targets_current_worktree(&worktree(false)),
+            "removing some other worktree"
+        );
+        assert!(
+            !super::removal_targets_current_worktree(&RemoveResult::BranchOnly {
+                branch_name: "feature".to_string(),
+                deletion_mode: BranchDeletionMode::SafeDelete,
+                pruned: false,
+                target_branch: None,
+                integration_reason: None,
+            }),
+            "a branch-only row has no worktree to be standing in"
+        );
+    }
+
+    /// `keep_current_worktree_row` keeps the row in place and stashes the
+    /// can't-remove-current-worktree info + switch-away hint — alt-x on the current
+    /// worktree never removes it and never spawns a background removal.
+    #[test]
+    fn test_keep_current_worktree_row() {
+        let test = worktrunk::testing::TestRepo::with_initial_commit();
+        let repo = worktrunk::git::Repository::at(test.path()).unwrap();
+
+        let item = branched_picker_item("current", &test.path().join("current"));
+        let token = item.output().to_string();
+        let items = Arc::new(Mutex::new(vec![Arc::clone(&item)]));
+        let collector = test_collector(Arc::clone(&items), repo.clone());
+
+        collector.keep_current_worktree_row(&token);
+
+        assert_eq!(
+            items
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|item| item.output().into_owned())
+                .collect::<Vec<_>>(),
+            vec![token.clone()],
+            "the current worktree row is kept, not removed"
+        );
+        let warnings = collector.stashed_warnings.lock().unwrap().clone();
+        assert!(
+            warnings.iter().any(|w| w.contains("current worktree")),
+            "stashes the can't-remove-current-worktree info: {warnings:?}"
+        );
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.contains("Switch to another worktree")),
+            "stashes the switch-away hint: {warnings:?}"
+        );
+
+        // A second alt-x on the same kept row dedups — the stash doesn't grow.
+        collector.keep_current_worktree_row(&token);
+        assert_eq!(
+            collector.stashed_warnings.lock().unwrap().len(),
+            warnings.len(),
+            "repeated alt-x on the current worktree stashes the hint only once"
+        );
+    }
+
+    /// alt-x on an unremovable target surfaces the same diagnostic `wt remove`
+    /// prints rather than swallowing it: `prepare_removal` errors (here the main
+    /// worktree can't be removed), so the dispatch's `Err` arm stashes the rendered
+    /// reason and keeps the row in place — no silent dead keypress.
+    #[test]
+    fn test_invoke_surfaces_unremovable_diagnostic() {
+        let test = worktrunk::testing::TestRepo::with_initial_commit();
+        let repo = worktrunk::git::Repository::at(test.path()).unwrap();
+
+        // The repo root is the main worktree — `prepare_worktree_removal` rejects it.
+        let item = branched_picker_item("main", test.path());
+        let token = item.output().to_string();
+        let items = Arc::new(Mutex::new(vec![Arc::clone(&item)]));
+        let mut collector = test_collector(Arc::clone(&items), repo.clone());
+
+        let cmd = format!("remove '{token}'");
+        let (_rx, _interrupt) = collector.invoke(&cmd, Arc::new(AtomicUsize::new(0)));
+
+        // Nothing was removed, so the row stays...
+        assert_eq!(
+            items
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|item| item.output().into_owned())
+                .collect::<Vec<_>>(),
+            vec![token],
+            "an unremovable row is never dropped"
+        );
+        // ...and the reason is surfaced, not swallowed.
+        let warnings = collector.stashed_warnings.lock().unwrap().clone();
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.contains("main worktree cannot be removed")),
+            "the unremovable diagnostic is stashed for the user: {warnings:?}"
+        );
+    }
+
     /// alt-x on an unmerged branch-only row never drops it (no flicker): an
     /// unmerged branch with no worktree resolves to `BranchOnly` with no
     /// integration reason, so `removal_will_remove_target` predicts `SafeDelete`
@@ -3053,6 +3933,7 @@ pub mod tests {
             approvals: Arc::new(Approvals::default()),
             render_tx: Arc::new(OnceLock::new()),
             stashed_warnings: Arc::clone(&stashed),
+            drop_landing: Arc::new(Mutex::new(None)),
         };
 
         let cmd = format!("remove '{token}'");

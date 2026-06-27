@@ -508,6 +508,14 @@ pub trait PickerProgressHandler: Send + Sync {
     /// benchmark early-exit, nor on the zero-worktree `Ok(None)` return
     /// (which exits before `on_skeleton`). Default: no-op.
     fn on_collect_complete(&self) {}
+
+    /// Hand the picker a clone of the collect layout, right after `on_skeleton`.
+    /// `LayoutConfig` is `!Sync`, so the handler stows it behind a lock for the
+    /// collector to read at `alt-x` time, where it renders a `/ branch` row on
+    /// the same grid as the worktree rows (the in-place morph). Default: no-op —
+    /// only the picker needs it. Column geometry is stable after skeleton (the
+    /// `--prs` rows already rely on that via `grid`), so one clone here suffices.
+    fn provide_layout(&self, _layout: &super::layout::LayoutConfig) {}
 }
 
 /// Controls how show flags (branches/remotes/full) are determined in [`collect`].
@@ -883,17 +891,15 @@ pub fn collect(
                 .any(|b| Some(b.name.as_str()) == default_branch.as_deref())
         });
 
-    // Filter local branches to those without worktrees (CPU-only, no git commands)
-    let branches_without_worktrees: Vec<(String, String)> = if show_branches {
-        fetched_local
-            .unwrap_or(&[])
-            .iter()
-            .filter(|b| !worktree_branches.contains(b.name.as_str()))
-            .map(|b| (b.name.clone(), b.commit_sha.clone()))
-            .collect()
-    } else {
-        Vec::new()
-    };
+    // Filter local branches to those without worktrees (CPU-only, no git
+    // commands). With `show_branches` off there are no branch-only rows.
+    let branches_without_worktrees: Vec<(String, String)> = fetched_local
+        .unwrap_or(&[])
+        .iter()
+        .filter(|_| show_branches)
+        .filter(|b| !worktree_branches.contains(b.name.as_str()))
+        .map(|b| (b.name.clone(), b.commit_sha.clone()))
+        .collect();
 
     if warn_stale_default && let Some(branch) = default_branch.as_deref() {
         emit_warning(
@@ -1276,6 +1282,9 @@ pub fn collect(
             layout.render_header_line(),
             layout.column_grid(),
         );
+        // Hand the picker the layout so `alt-x` can render a `/ branch` row on
+        // this same grid without re-collecting. No-op for non-picker handlers.
+        handler.provide_layout(&layout);
         // Mirror the `wt list` progressive-table marker so `wt-perf phases`
         // sees the same boundary across both commands.
         worktrunk::trace::instant("Skeleton rendered");
