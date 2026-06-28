@@ -1666,19 +1666,53 @@ pub fn handle_picker(
         if config.list.summary() && config.commit_generation.is_configured() {
             (config.commit_generation.command.clone(), None)
         } else {
+            // Point at the config file wt actually loads from — respecting
+            // --config, WORKTRUNK_CONFIG_PATH, and $XDG_CONFIG_HOME — rather
+            // than a hardcoded default. Fall back to the canonical path on the
+            // rare occasion no location can be determined.
+            let config_path = worktrunk::config::config_path()
+                .map(|p| format_path_for_display(&p))
+                .unwrap_or_else(|| "~/.config/worktrunk/config.toml".to_string());
+            // Keep every prose line short and put the resolved path on its own
+            // line. `render_summary` word-wraps prose to the preview width, and
+            // that width is a column narrower under Windows' PTY — so a sentence
+            // long enough to wrap lands its break on a different word there, and
+            // the single cross-platform snapshot can't match. A short lead line,
+            // the path alone (one unbreakable token, no wrap boundary to shift),
+            // and the fenced config block (code blocks are never wrapped) all
+            // render identically on every platform. The first line stays the bold
+            // H4 subject, which `render_summary` promotes and never wraps.
             let hint = if !config.commit_generation.is_configured() {
-                "Configure [commit.generation] command to enable LLM summaries.\n\n\
-                 Example in ~/.config/worktrunk/config.toml:\n\n\
-                 [commit.generation]\n\
-                 command = \"llm -m haiku\"\n\n\
-                 [list]\n\
-                 summary = true\n"
+                format!(
+                    r#"Summaries not configured
+
+Add a [commit.generation] command in:
+{config_path}
+
+```toml
+[commit.generation]
+command = "llm -m haiku"
+
+[list]
+summary = true
+```
+"#
+                )
             } else {
-                "Enable summaries in ~/.config/worktrunk/config.toml:\n\n\
-                 [list]\n\
-                 summary = true\n"
+                format!(
+                    r#"Summaries off
+
+Enable summaries in:
+{config_path}
+
+```toml
+[list]
+summary = true
+```
+"#
+                )
             };
-            (None, Some(hint.to_string()))
+            (None, Some(hint))
         };
 
     // The picker's full row list — header, worktree/branch rows, and (in `--prs`
